@@ -21,9 +21,8 @@ jobs:
         with:
           python-version: '3.11'
       - run: npm ci
-      - run: python -m pip install 'labgrid==26.0'
+      - run: python -m pip install 'labgrid @ git+https://github.com/labgrid-project/labgrid.git@eb05ee6730c0896ec90327ed9b49c93ecd4a5c13'
       - run: npm run check
       - run: npm test
       - run: LABGRID_REQUIRED=1 npm run validate:labgrid
       - run: npm run build
-
