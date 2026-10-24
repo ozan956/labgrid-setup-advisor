@@ -1,0 +1,749 @@
+schemaVersion: 1
+id: remote-power-control
+title: Remote Power Control
+description: Select a safe power-control method and generate Labgrid templates for a local bench or remote lab.
+
+questions:
+  - id: power-load
+    text: What do you want to control?
+    help: Choose the electrical load being switched, not how the board transfers data.
+    options:
+      - value: usb-board
+        label: A board powered through USB
+        description: The selected USB port supplies the board's operating power.
+      - value: external-adapter
+        label: A board with an external DC adapter
+        description: A separate mains adapter supplies the board's DC input.
+      - value: multiple-devices
+        label: Multiple independently powered devices
+        description: Each device needs a separately controlled power channel.
+
+  - id: controller
+    text: What power-control hardware do you have?
+    help: A normal USB hub is not enough; USB choices must support independent port power switching.
+    options:
+      - value: smart-usb-hub
+        label: A compatible USB hub
+        description: A hub verified to support per-port switching with uhubctl.
+      - value: ykush
+        label: A Yepkit YKUSH
+        description: A supported YKUSH, YKUSH XS, or YKUSH3 device controlled with ykushcmd.
+      - value: network-pdu
+        label: A network-controlled PDU
+        description: A network power switch with a Labgrid backend for its protocol and model.
+      - value: none
+        label: No control hardware yet
+        description: Start with manual power or choose hardware matched to the electrical load.
+
+  - id: location
+    text: Where is the hardware located?
+    help: Remote and shared hardware benefits from an exporter, coordinator, and named place.
+    options:
+      - value: local
+        label: Connected to this computer
+        description: Labgrid and any helper tool run on the same Linux machine as the hardware.
+      - value: remote-host
+        label: Connected to another network host
+        description: A remote Linux host is physically connected to the controller.
+      - value: remote-lab
+        label: In a shared hardware lab
+        description: Multiple people or CI jobs need coordinated, exclusive access.
+
+  - id: pdu-model
+    text: Which network PDU family do you have?
+    help: The model value selects a real Labgrid backend. Unknown hardware must be checked before generating a usable config.
+    visibleWhen:
+      all:
+        - question: controller
+          equals: network-pdu
+    options:
+      - value: netio
+        label: NETIO
+        description: NETIO 4-Port devices supported by the netio backend.
+      - value: gude
+        label: Gude
+        description: Gude devices supported by the gude backend; exact families may use another Gude backend.
+      - value: eaton
+        label: Eaton ePDU
+        description: Eaton ePDUs controlled over SNMP with Labgrid's optional SNMP dependencies.
+      - value: apc
+        label: APC PDU
+        description: APC power distribution units supported by Labgrid's SNMP backend.
+      - value: unknown
+        label: Another or unknown model
+        description: Check the upstream backend list and device protocol before writing configuration.
+
+recommendations:
+  - id: generic-usb-power
+    category: approach
+    title: Switch the board's USB supply with USBPowerDriver
+    summary: Use a verified per-port power-switching hub. This cuts power on one USB downstream port; it does not switch an external DC input.
+    when:
+      all:
+        - question: power-load
+          equals: usb-board
+        - question: controller
+          equals: smart-usb-hub
+    why:
+      - The board receives operating power from the USB port you intend to switch.
+      - Your controller is a generic hub, so Labgrid delegates switching to uhubctl.
+      - Compatibility must be verified because most USB hubs do not implement independent port power control correctly.
+    requirements:
+      hardware:
+        - A hub listed as compatible by uhubctl or verified locally with equivalent per-port behavior.
+        - A USB port whose voltage and current are within the board's published input specifications.
+      software:
+        - Labgrid on the machine running the driver.
+        - uhubctl and permission to control the hub on the machine physically connected to it.
+    components:
+      - kind: resource
+        name: USBPowerPort / NetworkUSBPowerPort
+        reason: Identifies one downstream port locally or after exporter translation.
+      - kind: driver
+        name: USBPowerDriver
+        reason: Implements PowerProtocol and ResetProtocol using uhubctl.
+    architecture:
+      - label: Labgrid driver
+        detail: Runs uhubctl where the hub is attached.
+      - label: Smart USB hub
+        detail: Switches VBUS for one verified downstream port.
+      - label: USB-powered board
+        detail: Receives power only within its documented USB limits.
+    commands:
+      - command: uhubctl
+        description: List hubs and confirm that the selected hub exposes controllable ports before configuring Labgrid.
+      - command: labgrid-suggest
+        description: Discover stable udev match candidates; fill in the port index yourself.
+    documentation: [usb-power, suggest, uhubctl]
+
+  - id: ykush-power
+    category: approach
+    title: Switch the USB supply with YKUSHPowerDriver
+    summary: Use the dedicated YKUSH resource and driver for a supported Yepkit USB switching hub.
+    when:
+      all:
+        - question: power-load
+          equals: usb-board
+        - question: controller
+          equals: ykush
+    why:
+      - The board is powered by the selected USB port.
+      - Labgrid has explicit YKUSH resource and driver classes instead of treating this as a generic uhubctl device.
+    requirements:
+      hardware:
+        - A supported Yepkit YKUSH, YKUSH XS, or YKUSH3 with a known serial number and downstream port.
+        - A board whose USB input stays within both board and YKUSH electrical specifications.
+      software:
+        - Labgrid on the machine running the driver.
+        - ykushcmd on the machine physically connected to the YKUSH.
+    components:
+      - kind: resource
+        name: YKUSHPowerPort / NetworkYKUSHPowerPort
+        reason: Identifies the YKUSH by serial number and downstream port.
+      - kind: driver
+        name: YKUSHPowerDriver
+        reason: Finds the YKUSH model and invokes ykushcmd for on, off, cycle, and status.
+    architecture:
+      - label: Labgrid driver
+        detail: Invokes ykushcmd locally or through the exporter host.
+      - label: YKUSH
+        detail: Switches the selected downstream USB port.
+      - label: USB-powered board
+        detail: Receives switched USB power within documented ratings.
+    commands:
+      - command: ykushcmd -l
+        description: List connected YKUSH devices and record the serial number.
+    documentation: [configuration, ykush]
+
+  - id: network-pdu-power
+    category: approach
+    title: Switch the complete outlet with NetworkPowerDriver
+    summary: Put the board's approved external adapter on one supported network PDU outlet and model it as a NetworkPowerPort.
+    when:
+      all:
+        - question: controller
+          equals: network-pdu
+    why:
+      - A network PDU is controlled directly over the network and maps to NetworkPowerPort.
+      - The selected backend determines the PDU protocol; host and outlet index remain site-specific.
+      - One resource represents one outlet, so independent devices should use distinct resources and outlets.
+    requirements:
+      hardware:
+        - A PDU model supported by the selected Labgrid backend.
+        - One correctly rated outlet per independently controlled external adapter.
+        - The board manufacturer's approved adapter, or an electrically equivalent supply.
+      software:
+        - Labgrid with any optional dependency required by the selected backend.
+        - Network reachability from the client or exporter that runs NetworkPowerDriver.
+    components:
+      - kind: resource
+        name: NetworkPowerPort
+        reason: Stores the exact backend model, PDU host, and outlet index.
+      - kind: driver
+        name: NetworkPowerDriver
+        reason: Loads the selected backend and implements PowerProtocol and ResetProtocol.
+    architecture:
+      - label: Labgrid driver
+        detail: Calls the backend selected by the resource's model field.
+      - label: Network PDU
+        detail: Switches one complete mains outlet.
+      - label: Approved adapter
+        detail: Converts mains power to the board's required DC input.
+      - label: Board
+        detail: Receives the voltage, polarity, and current specified by its manufacturer.
+    commands: []
+    documentation: [configuration, power-backends]
+
+  - id: no-hardware-usb
+    category: approach
+    title: Start manually, then choose a verified USB controller
+    summary: Use ManualPowerDriver during evaluation. For automation, add a compatible uhubctl hub or a YKUSH rather than assuming an ordinary hub can switch power.
+    when:
+      all:
+        - question: power-load
+          equals: usb-board
+        - question: controller
+          equals: none
+    why:
+      - No device is available for Labgrid to switch safely.
+      - ManualPowerDriver preserves a valid PowerProtocol workflow without claiming automation.
+    requirements:
+      hardware:
+        - No extra hardware for manual operation.
+        - For automation, a verified smart USB hub or supported YKUSH within the board's electrical limits.
+      software:
+        - Labgrid; pytest must run with uncaptured input for manual prompts.
+    components:
+      - kind: driver
+        name: ManualPowerDriver
+        reason: Prompts a person to turn power on, off, or cycle it.
+    architecture:
+      - label: Labgrid
+        detail: Pauses and asks for a manual power action.
+      - label: Operator
+        detail: Switches the board and confirms completion.
+    commands:
+      - command: pytest --lg-env environment.yaml --capture=no
+        description: Allow ManualPowerDriver prompts to reach the terminal during tests.
+    documentation: [configuration]
+
+  - id: no-hardware-external
+    category: approach
+    title: Start manually, then select a supported outlet controller
+    summary: Use ManualPowerDriver until a supported network PDU or properly engineered relay path is available.
+    when:
+      all:
+        - question: controller
+          equals: none
+      any:
+        - question: power-load
+          equals: external-adapter
+        - question: power-load
+          equals: multiple-devices
+    why:
+      - No controller is available for safe automation.
+      - External adapters and multiple loads need correctly rated, independently identified switching channels.
+    requirements:
+      hardware:
+        - No extra hardware for manual operation.
+        - For automation, supported switching hardware sized and wired for the actual load.
+      software:
+        - Labgrid; pytest must run with uncaptured input for manual prompts.
+    components:
+      - kind: driver
+        name: ManualPowerDriver
+        reason: Keeps manual control explicit until suitable switching hardware is installed.
+    architecture:
+      - label: Labgrid
+        detail: Requests a power action but does not energize hardware itself.
+      - label: Operator
+        detail: Uses the board's normal, electrically safe power path.
+    commands:
+      - command: pytest --lg-env environment.yaml --capture=no
+        description: Allow ManualPowerDriver prompts to reach the terminal during tests.
+    documentation: [configuration]
+
+  - id: incompatible-usb-controller
+    category: warning
+    title: This USB controller does not switch the stated load
+    summary: USBPowerDriver and YKUSHPowerDriver switch downstream USB power. They do not disconnect a separate DC adapter or arbitrary mains-powered devices.
+    when:
+      all:
+        - question: controller
+          in: [smart-usb-hub, ykush]
+      any:
+        - question: power-load
+          equals: external-adapter
+        - question: power-load
+          equals: multiple-devices
+    why:
+      - The electrical load and selected control path do not match.
+      - Rewiring power without checking voltage, polarity, current, grounding, and isolation can damage equipment or create a safety hazard.
+    requirements:
+      hardware:
+        - Select a supported PDU or a professionally designed, correctly rated relay path for the real load.
+      software: []
+    components: []
+    architecture: []
+    commands: []
+    documentation: [configuration, uhubctl]
+
+  - id: unknown-pdu
+    category: warning
+    title: Verify the PDU backend before using a template
+    summary: Labgrid does not have a universal network-PDU protocol. Confirm an exact backend or implement one upstream before configuring NetworkPowerPort.
+    when:
+      all:
+        - question: controller
+          equals: network-pdu
+        - question: pdu-model
+          equals: unknown
+    why:
+      - The `model` field is a Python backend module name, not a free-form product label.
+      - Generating a model value without a known backend would produce a broken configuration.
+    requirements:
+      hardware:
+        - Exact manufacturer, model, firmware, network protocol, and outlet numbering.
+      software:
+        - A matching backend from Labgrid's documented list.
+    components: []
+    architecture: []
+    commands: []
+    documentation: [power-backends]
+
+  - id: usb-board-on-pdu
+    category: warning
+    title: The PDU switches a charger, not the USB port
+    summary: This is whole-outlet control. Use a manufacturer-approved USB power adapter and do not describe the result as per-port USB switching.
+    when:
+      all:
+        - question: power-load
+          equals: usb-board
+        - question: controller
+          equals: network-pdu
+    why:
+      - NetworkPowerDriver switches the mains outlet feeding the adapter.
+      - USB data may remain connected through another path, which can back-power some boards.
+    requirements:
+      hardware:
+        - A safe adapter and wiring arrangement that prevents unintended back-power paths.
+      software: []
+    components: []
+    architecture: []
+    commands: []
+    documentation: [configuration]
+
+  - id: local-topology
+    category: topology
+    title: Keep this as a local Labgrid environment
+    summary: A coordinator and exporter are not required when the driver and its hardware or reachable PDU are on the same machine and no shared locking is needed.
+    when:
+      all:
+        - question: location
+          equals: local
+    why:
+      - Local resources can be declared directly under one target.
+      - Avoiding distributed services keeps a single-user bench simple.
+    requirements:
+      hardware: []
+      software:
+        - Labgrid and hardware-specific helper tools on this computer.
+    components:
+      - kind: infrastructure
+        name: Local environment file
+        reason: Defines resources and drivers directly; no RemotePlace is involved.
+    architecture:
+      - label: Developer or test
+        detail: Loads the environment YAML on this computer.
+      - label: Labgrid driver
+        detail: Talks directly to the local controller or reachable PDU.
+    commands: []
+    documentation: [configuration]
+
+  - id: distributed-topology
+    category: topology
+    title: Publish the controller through an exporter and coordinator
+    summary: Run the exporter beside the hardware, register a place with the coordinator, and let clients bind normal drivers to the RemotePlace resources.
+    when:
+      any:
+        - question: location
+          equals: remote-host
+        - question: location
+          equals: remote-lab
+    why:
+      - The hardware is not local to the developer or CI client.
+      - The coordinator tracks resources and enforces exclusive place acquisition.
+      - USB helper commands execute on the exporter host; the coordinator remains control-plane infrastructure.
+    requirements:
+      hardware:
+        - A Linux exporter host with physical access to USB controllers, or network access to the PDU.
+      software:
+        - labgrid-exporter on the hardware-side host.
+        - labgrid-coordinator reachable by exporter and clients.
+        - SSH access from clients to the exporter where Labgrid requires remote command execution.
+    components:
+      - kind: infrastructure
+        name: labgrid-exporter
+        reason: Discovers or publishes hardware-side resources and runs required host-local tools.
+      - kind: infrastructure
+        name: labgrid-coordinator
+        reason: Tracks resources, places, acquisitions, and reservations; it is not the hardware data path.
+      - kind: resource
+        name: RemotePlace
+        reason: Expands the acquired place into resources for the client target.
+    architecture:
+      - label: Developer / CI client
+        detail: Acquires a named place and loads the client environment.
+      - label: Coordinator
+        detail: Provides discovery and exclusive allocation, not power transport.
+      - label: Exporter host
+        detail: Publishes the resource and runs local tools when necessary.
+      - label: Power controller
+        detail: Switches the verified USB port or network outlet.
+    commands:
+      - command: labgrid-client -p <PLACE_NAME> acquire
+        description: Acquire exclusive access before controlling the board.
+      - command: labgrid-client -p <PLACE_NAME> power cycle
+        description: Cycle the matched power resource.
+      - command: labgrid-client -p <PLACE_NAME> release
+        description: Release the place after use.
+    documentation: [getting-started, exporter, overview]
+
+configurations:
+  - id: local-usb-power
+    title: Local environment
+    filename: environment.yaml
+    kind: environment
+    when:
+      all:
+        - question: power-load
+          equals: usb-board
+        - question: controller
+          equals: smart-usb-hub
+        - question: location
+          equals: local
+    template: |
+      targets:
+        main:
+          resources:
+            USBPowerPort:
+              match:
+                ID_PATH: '{{UDEV_ID_PATH}}'
+              index: {{USB_PORT_INDEX}}
+          drivers:
+            USBPowerDriver: {}
+    placeholders:
+      - token: UDEV_ID_PATH
+        label: Hub udev ID_PATH
+        description: Stable path for the hub interface, normally ending in :1.0; discover it with labgrid-suggest or udevadm.
+        example: pci-0000:00:14.0-usb-0:2:1.0
+        required: true
+      - token: USB_PORT_INDEX
+        label: Downstream port index
+        description: Physical controllable port number reported by uhubctl.
+        example: '1'
+        required: true
+
+  - id: remote-usb-exporter
+    title: Exporter resources
+    filename: exporter.yaml
+    kind: exporter
+    when:
+      all:
+        - question: power-load
+          equals: usb-board
+        - question: controller
+          equals: smart-usb-hub
+        - question: location
+          in: [remote-host, remote-lab]
+    template: |
+      {{EXPORT_GROUP}}:
+        USBPowerPort:
+          match:
+            ID_PATH: '{{UDEV_ID_PATH}}'
+          index: {{USB_PORT_INDEX}}
+    placeholders:
+      - token: EXPORT_GROUP
+        label: Exporter group
+        description: Stable group name for this board or setup.
+        example: board-01
+        required: true
+      - token: UDEV_ID_PATH
+        label: Hub udev ID_PATH
+        description: Stable hub-interface path on the exporter host, normally ending in :1.0.
+        example: pci-0000:00:14.0-usb-0:2:1.0
+        required: true
+      - token: USB_PORT_INDEX
+        label: Downstream port index
+        description: Physical controllable port number reported by uhubctl on the exporter host.
+        example: '1'
+        required: true
+
+  - id: remote-usb-client
+    title: Client environment
+    filename: remote.yaml
+    kind: environment
+    when:
+      all:
+        - question: power-load
+          equals: usb-board
+        - question: controller
+          equals: smart-usb-hub
+        - question: location
+          in: [remote-host, remote-lab]
+    template: |
+      targets:
+        main:
+          resources:
+            RemotePlace:
+              name: '{{PLACE_NAME}}'
+          drivers:
+            USBPowerDriver: {}
+    placeholders:
+      - token: PLACE_NAME
+        label: Coordinator place
+        description: Place whose match includes the exported USBPowerPort.
+        example: board-01
+        required: true
+
+  - id: local-ykush-power
+    title: Local environment
+    filename: environment.yaml
+    kind: environment
+    when:
+      all:
+        - question: power-load
+          equals: usb-board
+        - question: controller
+          equals: ykush
+        - question: location
+          equals: local
+    template: |
+      targets:
+        main:
+          resources:
+            YKUSHPowerPort:
+              serial: '{{YKUSH_SERIAL}}'
+              index: '{{YKUSH_PORT_INDEX}}'
+          drivers:
+            YKUSHPowerDriver: {}
+    placeholders:
+      - token: YKUSH_SERIAL
+        label: YKUSH serial
+        description: Serial printed by ykushcmd -l.
+        example: YK12345
+        required: true
+      - token: YKUSH_PORT_INDEX
+        label: YKUSH port
+        description: Downstream YKUSH port connected to the board.
+        example: '1'
+        required: true
+
+  - id: remote-ykush-exporter
+    title: Exporter resources
+    filename: exporter.yaml
+    kind: exporter
+    when:
+      all:
+        - question: power-load
+          equals: usb-board
+        - question: controller
+          equals: ykush
+        - question: location
+          in: [remote-host, remote-lab]
+    template: |
+      {{EXPORT_GROUP}}:
+        YKUSHPowerPort:
+          serial: '{{YKUSH_SERIAL}}'
+          index: '{{YKUSH_PORT_INDEX}}'
+    placeholders:
+      - token: EXPORT_GROUP
+        label: Exporter group
+        description: Stable group name for this board or setup.
+        example: board-01
+        required: true
+      - token: YKUSH_SERIAL
+        label: YKUSH serial
+        description: Serial printed by ykushcmd -l on the exporter host.
+        example: YK12345
+        required: true
+      - token: YKUSH_PORT_INDEX
+        label: YKUSH port
+        description: Downstream YKUSH port connected to the board.
+        example: '1'
+        required: true
+
+  - id: remote-ykush-client
+    title: Client environment
+    filename: remote.yaml
+    kind: environment
+    when:
+      all:
+        - question: power-load
+          equals: usb-board
+        - question: controller
+          equals: ykush
+        - question: location
+          in: [remote-host, remote-lab]
+    template: |
+      targets:
+        main:
+          resources:
+            RemotePlace:
+              name: '{{PLACE_NAME}}'
+          drivers:
+            YKUSHPowerDriver: {}
+    placeholders:
+      - token: PLACE_NAME
+        label: Coordinator place
+        description: Place whose match includes the exported YKUSHPowerPort.
+        example: board-01
+        required: true
+
+  - id: local-network-pdu
+    title: Local environment
+    filename: environment.yaml
+    kind: environment
+    when:
+      all:
+        - question: controller
+          equals: network-pdu
+        - question: pdu-model
+          in: [netio, gude, eaton, apc]
+        - question: location
+          equals: local
+    template: |
+      targets:
+        main:
+          resources:
+            NetworkPowerPort:
+              model: '{{answer:pdu-model}}'
+              host: '{{PDU_HOST}}'
+              index: {{PDU_OUTLET_INDEX}}
+          drivers:
+            NetworkPowerDriver: {}
+    placeholders:
+      - token: PDU_HOST
+        label: PDU hostname or address
+        description: Backend-specific hostname, address, or URL; do not commit credentials.
+        example: pdu.example.org
+        required: true
+      - token: PDU_OUTLET_INDEX
+        label: PDU outlet index
+        description: Exact outlet number used by the selected backend and physical PDU.
+        example: '1'
+        required: true
+
+  - id: remote-network-pdu-exporter
+    title: Exporter resources
+    filename: exporter.yaml
+    kind: exporter
+    when:
+      all:
+        - question: controller
+          equals: network-pdu
+        - question: pdu-model
+          in: [netio, gude, eaton, apc]
+        - question: location
+          in: [remote-host, remote-lab]
+    template: |
+      {{EXPORT_GROUP}}:
+        NetworkPowerPort:
+          model: '{{answer:pdu-model}}'
+          host: '{{PDU_HOST}}'
+          index: {{PDU_OUTLET_INDEX}}
+    placeholders:
+      - token: EXPORT_GROUP
+        label: Exporter group
+        description: Stable group name for this board or setup.
+        example: board-01
+        required: true
+      - token: PDU_HOST
+        label: PDU hostname or address
+        description: Address reachable by the client or exporter according to site routing; do not commit credentials.
+        example: pdu.example.org
+        required: true
+      - token: PDU_OUTLET_INDEX
+        label: PDU outlet index
+        description: Exact outlet number used by the selected backend and physical PDU.
+        example: '1'
+        required: true
+
+  - id: remote-network-pdu-client
+    title: Client environment
+    filename: remote.yaml
+    kind: environment
+    when:
+      all:
+        - question: controller
+          equals: network-pdu
+        - question: pdu-model
+          in: [netio, gude, eaton, apc]
+        - question: location
+          in: [remote-host, remote-lab]
+    template: |
+      targets:
+        main:
+          resources:
+            RemotePlace:
+              name: '{{PLACE_NAME}}'
+          drivers:
+            NetworkPowerDriver: {}
+    placeholders:
+      - token: PLACE_NAME
+        label: Coordinator place
+        description: Place whose match includes the exported NetworkPowerPort.
+        example: board-01
+        required: true
+
+  - id: local-manual-power
+    title: Local manual environment
+    filename: environment.yaml
+    kind: environment
+    when:
+      all:
+        - question: controller
+          equals: none
+        - question: location
+          equals: local
+    template: |
+      targets:
+        main:
+          drivers:
+            ManualPowerDriver:
+              name: '{{BOARD_NAME}}'
+    placeholders:
+      - token: BOARD_NAME
+        label: Board name
+        description: Human-readable name shown in manual power prompts.
+        example: example-board
+        required: true
+
+documentation:
+  - id: configuration
+    title: Labgrid configuration reference
+    url: https://labgrid.readthedocs.io/en/latest/configuration.html
+  - id: getting-started
+    title: Distributed infrastructure tutorial
+    url: https://labgrid.readthedocs.io/en/latest/getting_started.html
+  - id: overview
+    title: Resources, exporters, coordinator, and places
+    url: https://labgrid.readthedocs.io/en/latest/overview.html
+  - id: exporter
+    title: labgrid-exporter manual
+    url: https://labgrid.readthedocs.io/en/latest/man/exporter.html
+  - id: suggest
+    title: labgrid-suggest manual
+    url: https://labgrid.readthedocs.io/en/latest/man/suggest.html
+  - id: usb-power
+    title: Upstream USB power example
+    url: https://github.com/labgrid-project/labgrid/tree/master/examples/usbpower
+  - id: power-backends
+    title: Network power backend implementations
+    url: https://github.com/labgrid-project/labgrid/tree/master/labgrid/driver/power
+  - id: uhubctl
+    title: uhubctl compatible hubs and setup
+    url: https://github.com/mvp/uhubctl
+  - id: ykush
+    title: Yepkit YKUSH product information
+    url: https://www.yepkit.com/products/ykush
