@@ -1,0 +1,222 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://labgrid.org/schemas/setup-advisor/use-case-v1.json",
+  "title": "Labgrid Setup Advisor use case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "title", "description", "questions", "recommendations", "configurations", "documentation"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "$ref": "#/definitions/id" },
+    "title": { "$ref": "#/definitions/nonEmpty" },
+    "description": { "$ref": "#/definitions/nonEmpty" },
+    "questions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/question" }
+    },
+    "recommendations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/recommendation" }
+    },
+    "configurations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/configuration" }
+    },
+    "documentation": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/documentation" }
+    }
+  },
+  "definitions": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+    },
+    "nonEmpty": { "type": "string", "minLength": 1 },
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["question"],
+      "properties": {
+        "question": { "$ref": "#/definitions/id" },
+        "equals": { "$ref": "#/definitions/id" },
+        "in": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/definitions/id" }
+        }
+      },
+      "oneOf": [
+        { "required": ["equals"], "not": { "required": ["in"] } },
+        { "required": ["in"], "not": { "required": ["equals"] } }
+      ]
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "all": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/predicate" }
+        },
+        "any": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/predicate" }
+        }
+      }
+    },
+    "option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "label", "description"],
+      "properties": {
+        "value": { "$ref": "#/definitions/id" },
+        "label": { "$ref": "#/definitions/nonEmpty" },
+        "description": { "$ref": "#/definitions/nonEmpty" }
+      }
+    },
+    "question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "text", "help", "options"],
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "text": { "$ref": "#/definitions/nonEmpty" },
+        "help": { "$ref": "#/definitions/nonEmpty" },
+        "visibleWhen": { "$ref": "#/definitions/condition" },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/definitions/option" }
+        }
+      }
+    },
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "reason"],
+      "properties": {
+        "kind": { "enum": ["resource", "driver", "strategy", "infrastructure"] },
+        "name": { "$ref": "#/definitions/nonEmpty" },
+        "reason": { "$ref": "#/definitions/nonEmpty" }
+      }
+    },
+    "requirementGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hardware", "software"],
+      "properties": {
+        "hardware": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/nonEmpty" }
+        },
+        "software": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/nonEmpty" }
+        }
+      }
+    },
+    "architectureStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "detail"],
+      "properties": {
+        "label": { "$ref": "#/definitions/nonEmpty" },
+        "detail": { "$ref": "#/definitions/nonEmpty" }
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "description"],
+      "properties": {
+        "command": { "$ref": "#/definitions/nonEmpty" },
+        "description": { "$ref": "#/definitions/nonEmpty" }
+      }
+    },
+    "recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "category", "title", "summary", "when", "why", "requirements", "components", "architecture", "commands", "documentation"],
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "category": { "enum": ["approach", "topology", "warning"] },
+        "title": { "$ref": "#/definitions/nonEmpty" },
+        "summary": { "$ref": "#/definitions/nonEmpty" },
+        "when": { "$ref": "#/definitions/condition" },
+        "why": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/nonEmpty" }
+        },
+        "requirements": { "$ref": "#/definitions/requirementGroup" },
+        "components": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/component" }
+        },
+        "architecture": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/architectureStep" }
+        },
+        "commands": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/command" }
+        },
+        "documentation": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/definitions/id" }
+        }
+      }
+    },
+    "placeholder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["token", "label", "description", "example", "required"],
+      "properties": {
+        "token": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+        "label": { "$ref": "#/definitions/nonEmpty" },
+        "description": { "$ref": "#/definitions/nonEmpty" },
+        "example": { "$ref": "#/definitions/nonEmpty" },
+        "required": { "type": "boolean" }
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "filename", "kind", "when", "template", "placeholders"],
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "title": { "$ref": "#/definitions/nonEmpty" },
+        "filename": { "type": "string", "pattern": "^[a-zA-Z0-9._-]+\\.ya?ml$" },
+        "kind": { "enum": ["environment", "exporter"] },
+        "when": { "$ref": "#/definitions/condition" },
+        "template": { "$ref": "#/definitions/nonEmpty" },
+        "placeholders": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/placeholder" }
+        }
+      }
+    },
+    "documentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "url"],
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "title": { "$ref": "#/definitions/nonEmpty" },
+        "url": { "type": "string", "pattern": "^https://" }
+      }
+    }
+  }
+}
+
