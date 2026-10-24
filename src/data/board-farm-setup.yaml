@@ -1,0 +1,267 @@
+schemaVersion: 1
+id: board-farm-setup
+title: Board Farm Setup
+description: Organize multiple boards as exporter groups, coordinator places, and reservable capability pools.
+
+questions:
+  - id: lab-layout
+    text: How is the hardware distributed?
+    help: Exporters belong beside physical interfaces; one coordinator can allocate places across several locations.
+    options:
+      - value: one-site
+        label: One lab or rack area
+        description: One or more exporter hosts share a local hardware network.
+      - value: multiple-sites
+        label: Multiple labs or network locations
+        description: Exporters run at each site and connect to a shared coordinator.
+
+  - id: consumers
+    text: Who needs the board farm?
+    help: Stable place names suit direct developer access; tagged pools improve automated allocation.
+    options:
+      - value: developers
+        label: Mostly developers
+        description: People select and acquire known board places interactively.
+      - value: mixed
+        label: Developers and CI jobs
+        description: Interactive access and automated reservations share the same places.
+
+recommendations:
+  - id: farm-foundation
+    category: approach
+    title: Model one physical setup as one exporter group and place
+    summary: Keep every board's related resources in a stable exporter group, match that group to one coordinator place, and acquire the place as the unit of ownership.
+    when:
+      any:
+        - question: lab-layout
+          equals: one-site
+        - question: lab-layout
+          equals: multiple-sites
+    why:
+      - Exporter groups keep serial, power, flashing, and other resources for one setup together.
+      - Places provide a stable user-facing identity and exclusive ownership boundary.
+    requirements:
+      hardware:
+        - Linux exporter hosts with reliable USB topology, power, cooling, and network connectivity.
+        - Stable labels linking physical boards, cables, outlets, exporter groups, and places.
+      software:
+        - A monitored labgrid-coordinator and at least one labgrid-exporter.
+        - Configuration management for exporter files and service definitions.
+    components:
+      - kind: infrastructure
+        name: labgrid-exporter
+        reason: Publishes each board's physical and network resources as a group.
+      - kind: infrastructure
+        name: labgrid-coordinator
+        reason: Tracks resources, places, acquisitions, and reservations.
+      - kind: resource
+        name: RemotePlace
+        reason: Gives clients a stable target backed by the acquired place.
+    architecture:
+      - label: Developers and CI
+        detail: Acquire places through the coordinator.
+      - label: Coordinator
+        detail: Allocates complete board setups exclusively.
+      - label: Exporter hosts
+        detail: Publish hardware grouped per board.
+      - label: Board farm
+        detail: Provides labeled, electrically safe physical setups.
+    commands:
+      - command: labgrid-client --place <PLACE_NAME> create
+        description: Create one place for each physical setup.
+      - command: labgrid-client -p <PLACE_NAME> add-match '*/<EXPORT_GROUP>/*'
+        description: Assign the complete exporter group to that place.
+    documentation: [overview, getting-started, exporter]
+
+  - id: single-site-farm
+    category: topology
+    title: Keep exporters close to one lab network
+    summary: Use as many exporter hosts as USB and reliability constraints require, but keep one coordinator as the allocation authority.
+    when:
+      all:
+        - question: lab-layout
+          equals: one-site
+    why:
+      - Exporters can be scaled by rack or bench without changing the place model seen by clients.
+    requirements:
+      hardware:
+        - Enough isolated USB controllers and power channels to avoid unstable shared buses.
+      software:
+        - Unique exporter names and resource-group names.
+    components:
+      - kind: infrastructure
+        name: One coordinator, multiple exporters
+        reason: Separates hardware-facing processes from central allocation.
+    architecture: []
+    commands:
+      - command: labgrid-client resources
+        description: Audit the resources currently published by all exporters.
+    documentation: [overview]
+
+  - id: multisite-farm
+    category: topology
+    title: Run an exporter at every hardware location
+    summary: Connect site-local exporters to one reachable coordinator and design SSH, TLS, DNS, and proxy routing before adding boards.
+    when:
+      all:
+        - question: lab-layout
+          equals: multiple-sites
+    why:
+      - Hardware-facing tools must run close to USB devices while the coordinator only manages control-plane state.
+      - Multi-site connectivity and identity failures can otherwise strand acquired places.
+    requirements:
+      hardware:
+        - A maintained exporter host at each site.
+      software:
+        - Routed coordinator access, site DNS, required SSH access, and TLS where the deployment needs it.
+    components:
+      - kind: infrastructure
+        name: Site-local exporters
+        reason: Keep USB and board-control operations within each hardware location.
+      - kind: infrastructure
+        name: Shared coordinator
+        reason: Provides one place and reservation namespace across sites.
+    architecture:
+      - label: Site A exporter
+        detail: Publishes boards physically present at site A.
+      - label: Shared coordinator
+        detail: Allocates places without transporting hardware data.
+      - label: Site B exporter
+        detail: Publishes boards physically present at site B.
+    commands: []
+    documentation: [overview, proxy]
+
+  - id: developer-farm
+    category: topology
+    title: Give every board a clear stable place name
+    summary: Favor discoverable place names and documented labels when developers choose boards interactively.
+    when:
+      all:
+        - question: consumers
+          equals: developers
+    why:
+      - Physical-to-logical traceability shortens debugging and prevents work on the wrong board.
+    requirements:
+      hardware: []
+      software:
+        - A place naming and ownership convention maintained by lab operators.
+    components:
+      - kind: infrastructure
+        name: Named coordinator places
+        reason: Present stable board identities to users.
+    architecture: []
+    commands:
+      - command: labgrid-client places
+        description: List places and their current acquisition state.
+    documentation: [client]
+
+  - id: mixed-farm
+    category: topology
+    title: Add capability tags and reservation pools
+    summary: Keep stable place names for humans, then tag equivalent boards so CI jobs can reserve any compatible unit.
+    when:
+      all:
+        - question: consumers
+          equals: mixed
+    why:
+      - Reservations queue automated demand without preventing direct acquisition when a place is free.
+      - Capability tags make hardware requirements explicit in CI configuration.
+    requirements:
+      hardware:
+        - More than one genuinely interchangeable board setup for each pooled tag.
+      software:
+        - Version-controlled place tags and CI cleanup that releases places and cancels reservations.
+    components:
+      - kind: infrastructure
+        name: Coordinator tags and reservations
+        reason: Allocate any compatible free place to an automated job.
+    architecture: []
+    commands:
+      - command: labgrid-client reserve --wait board=<BOARD_TAG>
+        description: Wait for an available compatible place.
+    documentation: [reservations]
+
+configurations:
+  - id: farm-exporter-group
+    title: Repeatable exporter group
+    filename: exporter.yaml
+    kind: exporter
+    when:
+      any:
+        - question: lab-layout
+          equals: one-site
+        - question: lab-layout
+          equals: multiple-sites
+    template: |
+      {{EXPORT_GROUP}}:
+        location: '{{PHYSICAL_LOCATION}}'
+        USBSerialPort:
+          match:
+            ID_SERIAL_SHORT: '{{SERIAL_NUMBER}}'
+          speed: {{BAUD_RATE}}
+    placeholders:
+      - token: EXPORT_GROUP
+        label: Exporter group
+        description: Unique stable group name for one physical board setup.
+        example: board-01
+        required: true
+      - token: PHYSICAL_LOCATION
+        label: Physical location
+        description: Human-readable rack, shelf, or bench label.
+        example: rack-a-shelf-2
+        required: true
+      - token: SERIAL_NUMBER
+        label: Adapter serial number
+        description: Stable ID_SERIAL_SHORT visible on this exporter host.
+        example: FT123456
+        required: true
+      - token: BAUD_RATE
+        label: Baud rate
+        description: UART speed required by the board.
+        example: '115200'
+        required: true
+
+  - id: farm-client
+    title: Board-farm client environment
+    filename: remote.yaml
+    kind: environment
+    when:
+      any:
+        - question: consumers
+          equals: developers
+        - question: consumers
+          equals: mixed
+    template: |
+      targets:
+        main:
+          resources:
+            RemotePlace:
+              name: '{{PLACE_NAME}}'
+          drivers:
+            SerialDriver: {}
+    placeholders:
+      - token: PLACE_NAME
+        label: Coordinator place
+        description: Concrete place selected or allocated for this session.
+        example: board-01
+        required: true
+
+documentation:
+  - id: overview
+    title: Remote resources, exporters, coordinator, and places
+    url: https://labgrid.readthedocs.io/en/latest/overview.html
+  - id: getting-started
+    title: Distributed infrastructure tutorial
+    url: https://labgrid.readthedocs.io/en/latest/getting_started.html
+  - id: exporter
+    title: labgrid-exporter manual
+    url: https://labgrid.readthedocs.io/en/latest/man/exporter.html
+  - id: client
+    title: labgrid-client manual
+    url: https://labgrid.readthedocs.io/en/latest/man/client.html
+  - id: reservations
+    title: Places, tags, and reservations
+    url: https://labgrid.readthedocs.io/en/latest/usage.html#places-and-reservations
+  - id: proxy
+    title: Labgrid proxy mechanism
+    url: https://labgrid.readthedocs.io/en/latest/overview.html#proxy-mechanism

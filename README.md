@@ -5,7 +5,17 @@ asks one question at a time, recommends real Resources and Drivers, explains
 the topology, and generates conservative YAML templates with explicit hardware
 placeholders.
 
-The MVP implements Remote Power Control for:
+The advisor implements seven selectable workflows:
+
+- Remote Power Control;
+- Serial Console Access;
+- Firmware Flashing with OpenOCD, Fastboot, or DFU;
+- Automated Hardware Testing with pytest;
+- CI Integration with fixed places or reservation pools;
+- Remote Board Access;
+- Board Farm Setup.
+
+Remote Power Control covers:
 
 - generic USB hubs supported by `uhubctl` with `USBPowerPort` and
   `USBPowerDriver`;
@@ -15,8 +25,8 @@ The MVP implements Remote Power Control for:
 - local benches and remote setups using an exporter, coordinator, and
   `RemotePlace`.
 
-Serial access, flashing, CI, and board-farm guidance are visible as planned
-use cases but cannot be selected.
+Every workflow produces reviewed component guidance, topology advice, commands,
+and conservative Labgrid YAML templates with explicit site-specific placeholders.
 
 ## Why it exists
 
@@ -105,4 +115,3 @@ tests/         schema, engine, generator, definition, and journey tests
 scripts/       optional validation against upstream Labgrid Python APIs
 docs/          research, architecture, authoring, and deployment notes
 ```
-

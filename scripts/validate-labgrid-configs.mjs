@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,23 +6,28 @@ import { spawnSync } from 'node:child_process';
 import { parse } from 'yaml';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const definition = parse(readFileSync(join(root, 'src/data/remote-power-control.yaml'), 'utf8'));
-const answers = Object.fromEntries(definition.questions.map((question) => [question.id, question.options[0].value]));
-answers['pdu-model'] = 'netio';
+const definitions = readdirSync(join(root, 'src/data'))
+  .filter((filename) => filename.endsWith('.yaml') && filename !== 'catalog.yaml')
+  .map((filename) => parse(readFileSync(join(root, 'src/data', filename), 'utf8')));
 
 const directory = mkdtempSync(join(tmpdir(), 'labgrid-advisor-'));
 const manifest = [];
 
 try {
-  for (const configuration of definition.configurations) {
-    let content = configuration.template.replace(/\{\{answer:([a-z][a-z0-9-]*)\}\}/g, (_, id) => answers[id]);
-    for (const placeholder of configuration.placeholders) {
-      content = content.replaceAll(`{{${placeholder.token}}}`, placeholder.example);
+  for (const definition of definitions) {
+    const answers = Object.fromEntries(definition.questions.map((question) => [question.id, question.options[0].value]));
+    answers['pdu-model'] = 'netio';
+
+    for (const configuration of definition.configurations) {
+      let content = configuration.template.replace(/\{\{answer:([a-z][a-z0-9-]*)\}\}/g, (_, id) => answers[id]);
+      for (const placeholder of configuration.placeholders) {
+        content = content.replaceAll(`{{${placeholder.token}}}`, placeholder.example);
+      }
+      parse(content);
+      const path = join(directory, `${definition.id}-${configuration.id}.yaml`);
+      writeFileSync(path, content);
+      manifest.push({ id: `${definition.id}/${configuration.id}`, kind: configuration.kind, path });
     }
-    parse(content);
-    const path = join(directory, `${configuration.id}.yaml`);
-    writeFileSync(path, content);
-    manifest.push({ id: configuration.id, kind: configuration.kind, path });
   }
   const manifestPath = join(directory, 'manifest.json');
   writeFileSync(manifestPath, JSON.stringify(manifest));
@@ -49,4 +54,3 @@ try {
 } finally {
   rmSync(directory, { recursive: true, force: true });
 }
-

@@ -1,0 +1,216 @@
+schemaVersion: 1
+id: ci-integration
+title: CI Integration
+description: Acquire shared hardware safely from a CI job, run Labgrid tests, and release it reliably.
+
+questions:
+  - id: allocation
+    text: How should the CI job select hardware?
+    help: A fixed place is simple; a tagged pool lets the coordinator allocate any compatible free board.
+    options:
+      - value: fixed-place
+        label: One named place
+        description: The job always targets a known board such as board-01.
+      - value: tagged-pool
+        label: Any board matching tags
+        description: A reservation selects an available place from a compatible pool.
+
+  - id: workload
+    text: What will the job run?
+    help: Both paths require acquisition before the workload and unconditional cleanup afterward.
+    options:
+      - value: pytest
+        label: A pytest hardware suite
+        description: Tests use Labgrid's pytest target fixture and environment file.
+      - value: client-command
+        label: Labgrid client commands
+        description: The job runs a focused power, console, digital-I/O, or strategy action.
+
+recommendations:
+  - id: fixed-ci-place
+    category: approach
+    title: Acquire one named place in the job
+    summary: Use a stable place name when the pipeline is intentionally tied to one physical setup.
+    when:
+      all:
+        - question: allocation
+          equals: fixed-place
+    why:
+      - A named place is predictable and easy to diagnose.
+      - Acquisition still prevents concurrent developers or jobs from using the board.
+    requirements:
+      hardware:
+        - A board already published by an exporter and assigned to the named place.
+      software:
+        - Network access to the coordinator and exporter, plus credentials and SSH configuration required by the site.
+    components:
+      - kind: resource
+        name: RemotePlace
+        reason: Loads the resources assigned to the fixed coordinator place.
+      - kind: infrastructure
+        name: labgrid-coordinator
+        reason: Enforces exclusive acquisition for the job.
+    architecture:
+      - label: CI job
+        detail: Acquires the named place and runs the workload.
+      - label: Coordinator
+        detail: Rejects concurrent acquisition.
+      - label: Exporter
+        detail: Exposes the physical board resources.
+    commands:
+      - command: labgrid-client -p <PLACE_NAME> acquire
+        description: Acquire the fixed place at job start.
+      - command: labgrid-client -p <PLACE_NAME> release
+        description: Release it in a finally or after-script step.
+    documentation: [client, getting-started]
+
+  - id: pooled-ci-place
+    category: approach
+    title: Reserve a compatible board by tag
+    summary: Tag equivalent places, reserve with --wait and --shell, then address the allocated place through the LG_RESERVATION expansion.
+    when:
+      all:
+        - question: allocation
+          equals: tagged-pool
+    why:
+      - Reservations queue jobs until any compatible place is free.
+      - Tags decouple a pipeline from one physical serial number or rack slot.
+    requirements:
+      hardware:
+        - Equivalent board places carrying a shared coordinator tag such as board=imx8.
+      software:
+        - A shell-capable CI runner that preserves LG_RESERVATION for acquire, workload, release, and cancellation.
+    components:
+      - kind: infrastructure
+        name: Coordinator reservations
+        reason: Select and hold one matching place for the CI owner.
+      - kind: resource
+        name: RemotePlace
+        reason: Supplies the allocated place's resources to the workload.
+    architecture:
+      - label: CI scheduler
+        detail: Starts a job that requests compatible hardware.
+      - label: Coordinator reservation
+        detail: Waits for and allocates one tagged place.
+      - label: Exporter
+        detail: Exposes the chosen board.
+    commands:
+      - command: eval "$(labgrid-client reserve --wait --shell board=<BOARD_TAG>)"
+        description: Create a reservation and export LG_RESERVATION.
+      - command: labgrid-client -p + acquire
+        description: Acquire the place allocated to the reservation.
+      - command: labgrid-client -p + release
+        description: Release the allocated place during cleanup.
+      - command: labgrid-client cancel-reservation
+        description: Cancel the reservation after releasing the place.
+    documentation: [reservations, client]
+
+  - id: pytest-ci
+    category: topology
+    title: Run pytest against the acquired RemotePlace
+    summary: Keep the Labgrid environment in the repository and pass it to pytest only after hardware acquisition succeeds.
+    when:
+      all:
+        - question: workload
+          equals: pytest
+    why:
+      - The pytest plugin loads the same drivers used interactively.
+      - Separating allocation from tests makes failure and cleanup behavior visible in CI logs.
+    requirements:
+      hardware: []
+      software:
+        - Labgrid and the project's test dependencies installed in the CI image.
+    components:
+      - kind: infrastructure
+        name: Labgrid pytest plugin
+        reason: Provides configured targets to hardware tests.
+    architecture: []
+    commands:
+      - command: pytest --lg-env ci.yaml
+        description: Run the suite after acquiring the selected place.
+    documentation: [pytest]
+
+  - id: command-ci
+    category: topology
+    title: Run one explicit labgrid-client action
+    summary: Use client commands for small smoke operations, while keeping acquisition and cleanup identical to a full test job.
+    when:
+      all:
+        - question: workload
+          equals: client-command
+    why:
+      - Focused client commands are useful for smoke checks and maintenance jobs.
+    requirements:
+      hardware: []
+      software:
+        - A client environment containing the driver required by the selected command.
+    components:
+      - kind: infrastructure
+        name: labgrid-client
+        reason: Activates the configured driver for one command.
+    architecture: []
+    commands:
+      - command: labgrid-client -c ci.yaml console
+        description: Example smoke action supported by the generated serial-console environment.
+    documentation: [client]
+
+configurations:
+  - id: fixed-ci-client
+    title: Fixed-place CI environment
+    filename: ci.yaml
+    kind: environment
+    when:
+      all:
+        - question: allocation
+          equals: fixed-place
+    template: |
+      targets:
+        main:
+          resources:
+            RemotePlace:
+              name: '{{PLACE_NAME}}'
+          drivers:
+            SerialDriver: {}
+    placeholders:
+      - token: PLACE_NAME
+        label: Coordinator place
+        description: Existing place whose exported resources include a serial console.
+        example: board-01
+        required: true
+
+  - id: pooled-ci-client
+    title: Reserved-place CI environment
+    filename: ci.yaml
+    kind: environment
+    when:
+      all:
+        - question: allocation
+          equals: tagged-pool
+    template: |
+      targets:
+        main:
+          resources:
+            RemotePlace:
+              name: '{{ALLOCATED_PLACE}}'
+          drivers:
+            SerialDriver: {}
+    placeholders:
+      - token: ALLOCATED_PLACE
+        label: Allocated place
+        description: Concrete place returned by the reservation; generate or template this value in the CI job.
+        example: board-01
+        required: true
+
+documentation:
+  - id: client
+    title: labgrid-client manual
+    url: https://labgrid.readthedocs.io/en/latest/man/client.html
+  - id: getting-started
+    title: Distributed infrastructure tutorial
+    url: https://labgrid.readthedocs.io/en/latest/getting_started.html
+  - id: reservations
+    title: Places, tags, and reservations
+    url: https://labgrid.readthedocs.io/en/latest/usage.html#places-and-reservations
+  - id: pytest
+    title: Labgrid pytest integration
+    url: https://labgrid.readthedocs.io/en/latest/usage.html

@@ -26,8 +26,8 @@ export function Results({ definition, answers, onEdit, onRestart }: Props) {
       <section className="results-hero">
         <div>
           <div className="section-kicker">Recommendation ready</div>
-          <h1>Your Labgrid power setup</h1>
-          <p>Built from verified upstream components. Review every placeholder and electrical requirement before connecting hardware.</p>
+          <h1>Your {definition.title} setup</h1>
+          <p>Built from verified upstream components. Review every placeholder and hardware-specific requirement before using it.</p>
         </div>
         <div className="results-actions">
           <button className="button secondary" onClick={onEdit}>Review answers</button>

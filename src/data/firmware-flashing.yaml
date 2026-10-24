@@ -1,0 +1,497 @@
+schemaVersion: 1
+id: firmware-flashing
+title: Firmware Flashing
+description: Match a supported flashing interface to its Labgrid resource and driver, locally or through an exporter.
+
+questions:
+  - id: flash-method
+    text: Which flashing interface does the target support?
+    help: Choose a mechanism documented by the board vendor; these methods are not interchangeable.
+    options:
+      - value: openocd
+        label: A JTAG/SWD adapter supported by OpenOCD
+        description: The target is programmed through a supported USB debug probe.
+      - value: fastboot
+        label: USB Fastboot
+        description: The target enters an Android-compatible USB Fastboot mode.
+      - value: dfu
+        label: USB DFU
+        description: The target exposes a standards-based Device Firmware Upgrade interface.
+
+  - id: location
+    text: Where is the flashing interface connected?
+    help: USB tools must run on the host physically connected to the interface.
+    options:
+      - value: local
+        label: This computer
+        description: The debug probe or USB device is attached locally.
+      - value: remote
+        label: A remote exporter host
+        description: The interface is published through a coordinator place.
+
+recommendations:
+  - id: openocd-flashing
+    category: approach
+    title: Flash through USBDebugger and OpenOCDDriver
+    summary: Identify a supported USB debug probe with USBDebugger and provide board-specific OpenOCD configuration to OpenOCDDriver.
+    when:
+      all:
+        - question: flash-method
+          equals: openocd
+    why:
+      - OpenOCDDriver binds only to supported debug resources such as USBDebugger or NetworkUSBDebugger.
+      - Interface and board scripts are target-specific and cannot be inferred safely.
+    requirements:
+      hardware:
+        - A probe accepted by Labgrid's USBDebugger resource and electrically compatible with the target debug interface.
+      software:
+        - OpenOCD 0.11 or newer is recommended when selecting among multiple USB probes by path.
+        - Correct interface and board configuration scripts for the target.
+    components:
+      - kind: resource
+        name: USBDebugger / NetworkUSBDebugger
+        reason: Selects the physical debug probe locally or through an exporter.
+      - kind: driver
+        name: OpenOCDDriver
+        reason: Implements BootstrapProtocol by invoking OpenOCD with the selected USB path.
+    architecture:
+      - label: OpenOCDDriver
+        detail: Uploads the image and runs board-specific commands.
+      - label: Debug probe
+        detail: Drives the target's supported JTAG or SWD interface.
+      - label: Target
+        detail: Receives firmware using vendor-approved wiring and voltage levels.
+    commands:
+      - command: labgrid-suggest
+        description: Discover a stable udev match for the USB debug probe.
+    documentation: [openocd, suggest]
+
+  - id: fastboot-flashing
+    category: approach
+    title: Flash with AndroidUSBFastboot and AndroidFastbootDriver
+    summary: Match the target only while it is in USB Fastboot mode, then use AndroidFastbootDriver for explicit boot, flash, erase, or continue operations.
+    when:
+      all:
+        - question: flash-method
+          equals: fastboot
+    why:
+      - AndroidUSBFastboot is the current upstream resource name; AndroidFastboot remains only for compatibility.
+      - Partition names, images, and the procedure for entering Fastboot are board-specific.
+    requirements:
+      hardware:
+        - A target with a documented USB Fastboot mode and a data-capable USB connection.
+      software:
+        - The fastboot executable and permissions for the USB device on the connected host.
+    components:
+      - kind: resource
+        name: AndroidUSBFastboot / RemoteAndroidUSBFastboot
+        reason: Identifies the target while it is in USB Fastboot mode.
+      - kind: driver
+        name: AndroidFastbootDriver
+        reason: Runs Fastboot operations locally or through the exporter host.
+    architecture:
+      - label: Labgrid client
+        detail: Activates AndroidFastbootDriver with an explicit image and partition.
+      - label: Fastboot tool
+        detail: Runs where the USB device is connected.
+      - label: Target bootloader
+        detail: Validates and writes the requested partition according to vendor guidance.
+    commands: []
+    documentation: [fastboot]
+
+  - id: dfu-flashing
+    category: approach
+    title: Flash with DFUDevice and DFUDriver
+    summary: Match the target in USB DFU mode and use DFUDriver with device-specific alternate setting and image arguments.
+    when:
+      all:
+        - question: flash-method
+          equals: dfu
+    why:
+      - Labgrid has dedicated local and exported resources for USB DFU devices.
+      - DFU alternate settings and memory layout remain specific to the target firmware.
+    requirements:
+      hardware:
+        - A target with a documented USB DFU mode and a data-capable USB connection.
+      software:
+        - dfu-util and USB permissions on the host physically connected to the target.
+    components:
+      - kind: resource
+        name: DFUDevice / NetworkDFUDevice
+        reason: Selects the USB DFU interface locally or through the exporter.
+      - kind: driver
+        name: DFUDriver
+        reason: Invokes dfu-util for the selected device.
+    architecture:
+      - label: DFUDriver
+        detail: Runs an explicit download operation.
+      - label: dfu-util
+        detail: Communicates with the selected USB DFU interface.
+      - label: Target
+        detail: Writes only the vendor-documented alternate setting or address.
+    commands: []
+    documentation: [dfu]
+
+  - id: local-flashing
+    category: topology
+    title: Run the flashing tool locally
+    summary: A coordinator is unnecessary when the USB interface and Labgrid process are on one trusted workstation.
+    when:
+      all:
+        - question: location
+          equals: local
+    why:
+      - Managed USB resources can be declared directly in a local environment.
+    requirements:
+      hardware: []
+      software:
+        - Appropriate udev permissions for the selected USB interface.
+    components:
+      - kind: infrastructure
+        name: Local environment file
+        reason: Keeps resource selection and its driver on one machine.
+    architecture: []
+    commands: []
+    documentation: [configuration]
+
+  - id: remote-flashing
+    category: topology
+    title: Run the flashing tool on the exporter host
+    summary: Export the USB interface, acquire its place, and let Labgrid transfer images and execute the selected tool beside the hardware.
+    when:
+      all:
+        - question: location
+          equals: remote
+    why:
+      - USB devices cannot be treated as arbitrary network endpoints; the exporter provides their remote Labgrid representation.
+    requirements:
+      hardware:
+        - A Linux exporter host physically connected to the target interface.
+      software:
+        - The selected flashing tool on the exporter and passwordless SSH from the client where required.
+    components:
+      - kind: infrastructure
+        name: labgrid-exporter and labgrid-coordinator
+        reason: Publish the interface and enforce exclusive access.
+      - kind: resource
+        name: RemotePlace
+        reason: Supplies the exported flashing resource to the client target.
+    architecture:
+      - label: Client
+        detail: Acquires the place and supplies the image.
+      - label: Coordinator
+        detail: Allocates the interface exclusively.
+      - label: Exporter host
+        detail: Runs OpenOCD, fastboot, or dfu-util beside the USB device.
+    commands:
+      - command: labgrid-client -p <PLACE_NAME> acquire
+        description: Acquire the target before flashing.
+      - command: labgrid-client -p <PLACE_NAME> release
+        description: Release it after the operation, including failed jobs.
+    documentation: [getting-started, exporter]
+
+configurations:
+  - id: local-openocd
+    title: Local OpenOCD environment
+    filename: environment.yaml
+    kind: environment
+    when:
+      all:
+        - question: flash-method
+          equals: openocd
+        - question: location
+          equals: local
+    template: |
+      targets:
+        main:
+          resources:
+            USBDebugger:
+              match:
+                ID_PATH: '{{UDEV_ID_PATH}}'
+          drivers:
+            OpenOCDDriver:
+              interface_config: '{{INTERFACE_CONFIG}}'
+              board_config: '{{BOARD_CONFIG}}'
+    placeholders:
+      - token: UDEV_ID_PATH
+        label: Probe udev path
+        description: Stable ID_PATH for the exact debug probe.
+        example: pci-0000:00:14.0-usb-0:2.3
+        required: true
+      - token: INTERFACE_CONFIG
+        label: OpenOCD interface script
+        description: Path relative to OpenOCD's interface scripts directory.
+        example: ftdi/example.cfg
+        required: true
+      - token: BOARD_CONFIG
+        label: OpenOCD board script
+        description: Board script verified for the target.
+        example: example-board.cfg
+        required: true
+
+  - id: local-fastboot
+    title: Local Fastboot environment
+    filename: environment.yaml
+    kind: environment
+    when:
+      all:
+        - question: flash-method
+          equals: fastboot
+        - question: location
+          equals: local
+    template: |
+      targets:
+        main:
+          resources:
+            AndroidUSBFastboot:
+              match:
+                ID_PATH: '{{UDEV_ID_PATH}}'
+              usb_vendor_id: '{{USB_VENDOR_ID}}'
+              usb_product_id: '{{USB_PRODUCT_ID}}'
+          drivers:
+            AndroidFastbootDriver: {}
+    placeholders:
+      - token: UDEV_ID_PATH
+        label: Target udev path
+        description: Stable path for the target while it is in Fastboot mode.
+        example: pci-0000:00:14.0-usb-0:2.4
+        required: true
+      - token: USB_VENDOR_ID
+        label: USB vendor ID
+        description: Four hexadecimal digits reported in Fastboot mode.
+        example: 18d1
+        required: true
+      - token: USB_PRODUCT_ID
+        label: USB product ID
+        description: Four hexadecimal digits reported in Fastboot mode.
+        example: 4ee0
+        required: true
+
+  - id: local-dfu
+    title: Local DFU environment
+    filename: environment.yaml
+    kind: environment
+    when:
+      all:
+        - question: flash-method
+          equals: dfu
+        - question: location
+          equals: local
+    template: |
+      targets:
+        main:
+          resources:
+            DFUDevice:
+              match:
+                ID_PATH: '{{UDEV_ID_PATH}}'
+          drivers:
+            DFUDriver: {}
+    placeholders:
+      - token: UDEV_ID_PATH
+        label: Target udev path
+        description: Stable path for the target while it is in DFU mode.
+        example: pci-0000:00:14.0-usb-0:2.5
+        required: true
+
+  - id: remote-openocd-exporter
+    title: OpenOCD exporter resources
+    filename: exporter.yaml
+    kind: exporter
+    when:
+      all:
+        - question: flash-method
+          equals: openocd
+        - question: location
+          equals: remote
+    template: |
+      {{EXPORT_GROUP}}:
+        USBDebugger:
+          match:
+            ID_PATH: '{{UDEV_ID_PATH}}'
+    placeholders:
+      - token: EXPORT_GROUP
+        label: Exporter group
+        description: Resource group assigned to the board's place.
+        example: board-01
+        required: true
+      - token: UDEV_ID_PATH
+        label: Probe udev path
+        description: Stable ID_PATH visible on the exporter host.
+        example: pci-0000:00:14.0-usb-0:2.3
+        required: true
+
+  - id: remote-fastboot-exporter
+    title: Fastboot exporter resources
+    filename: exporter.yaml
+    kind: exporter
+    when:
+      all:
+        - question: flash-method
+          equals: fastboot
+        - question: location
+          equals: remote
+    template: |
+      {{EXPORT_GROUP}}:
+        AndroidUSBFastboot:
+          match:
+            ID_PATH: '{{UDEV_ID_PATH}}'
+          usb_vendor_id: '{{USB_VENDOR_ID}}'
+          usb_product_id: '{{USB_PRODUCT_ID}}'
+    placeholders:
+      - token: EXPORT_GROUP
+        label: Exporter group
+        description: Resource group assigned to the board's place.
+        example: board-01
+        required: true
+      - token: UDEV_ID_PATH
+        label: Target udev path
+        description: Stable path visible in Fastboot mode on the exporter host.
+        example: pci-0000:00:14.0-usb-0:2.4
+        required: true
+      - token: USB_VENDOR_ID
+        label: USB vendor ID
+        description: Four hexadecimal digits reported in Fastboot mode.
+        example: 18d1
+        required: true
+      - token: USB_PRODUCT_ID
+        label: USB product ID
+        description: Four hexadecimal digits reported in Fastboot mode.
+        example: 4ee0
+        required: true
+
+  - id: remote-dfu-exporter
+    title: DFU exporter resources
+    filename: exporter.yaml
+    kind: exporter
+    when:
+      all:
+        - question: flash-method
+          equals: dfu
+        - question: location
+          equals: remote
+    template: |
+      {{EXPORT_GROUP}}:
+        DFUDevice:
+          match:
+            ID_PATH: '{{UDEV_ID_PATH}}'
+    placeholders:
+      - token: EXPORT_GROUP
+        label: Exporter group
+        description: Resource group assigned to the board's place.
+        example: board-01
+        required: true
+      - token: UDEV_ID_PATH
+        label: Target udev path
+        description: Stable path visible in DFU mode on the exporter host.
+        example: pci-0000:00:14.0-usb-0:2.5
+        required: true
+
+  - id: remote-openocd-client
+    title: Remote OpenOCD client environment
+    filename: remote.yaml
+    kind: environment
+    when:
+      all:
+        - question: flash-method
+          equals: openocd
+        - question: location
+          equals: remote
+    template: |
+      targets:
+        main:
+          resources:
+            RemotePlace:
+              name: '{{PLACE_NAME}}'
+          drivers:
+            OpenOCDDriver:
+              interface_config: '{{INTERFACE_CONFIG}}'
+              board_config: '{{BOARD_CONFIG}}'
+    placeholders:
+      - token: PLACE_NAME
+        label: Coordinator place
+        description: Place matched to the exported debug probe.
+        example: board-01
+        required: true
+      - token: INTERFACE_CONFIG
+        label: OpenOCD interface script
+        description: Path relative to OpenOCD's interface scripts directory.
+        example: ftdi/example.cfg
+        required: true
+      - token: BOARD_CONFIG
+        label: OpenOCD board script
+        description: Board script verified for the target.
+        example: example-board.cfg
+        required: true
+
+  - id: remote-fastboot-client
+    title: Remote Fastboot client environment
+    filename: remote.yaml
+    kind: environment
+    when:
+      all:
+        - question: flash-method
+          equals: fastboot
+        - question: location
+          equals: remote
+    template: |
+      targets:
+        main:
+          resources:
+            RemotePlace:
+              name: '{{PLACE_NAME}}'
+          drivers:
+            AndroidFastbootDriver: {}
+    placeholders:
+      - token: PLACE_NAME
+        label: Coordinator place
+        description: Place matched to the exported Fastboot resource.
+        example: board-01
+        required: true
+
+  - id: remote-dfu-client
+    title: Remote DFU client environment
+    filename: remote.yaml
+    kind: environment
+    when:
+      all:
+        - question: flash-method
+          equals: dfu
+        - question: location
+          equals: remote
+    template: |
+      targets:
+        main:
+          resources:
+            RemotePlace:
+              name: '{{PLACE_NAME}}'
+          drivers:
+            DFUDriver: {}
+    placeholders:
+      - token: PLACE_NAME
+        label: Coordinator place
+        description: Place matched to the exported DFU resource.
+        example: board-01
+        required: true
+
+documentation:
+  - id: configuration
+    title: Labgrid configuration reference
+    url: https://labgrid.readthedocs.io/en/latest/configuration.html
+  - id: openocd
+    title: OpenOCDDriver reference
+    url: https://labgrid.readthedocs.io/en/latest/configuration.html#openocddriver
+  - id: fastboot
+    title: AndroidFastbootDriver reference
+    url: https://labgrid.readthedocs.io/en/latest/configuration.html#androidfastbootdriver
+  - id: dfu
+    title: DFUDriver reference
+    url: https://labgrid.readthedocs.io/en/latest/configuration.html#dfudriver
+  - id: suggest
+    title: labgrid-suggest manual
+    url: https://labgrid.readthedocs.io/en/latest/man/suggest.html
+  - id: getting-started
+    title: Distributed infrastructure tutorial
+    url: https://labgrid.readthedocs.io/en/latest/getting_started.html
+  - id: exporter
+    title: labgrid-exporter manual
+    url: https://labgrid.readthedocs.io/en/latest/man/exporter.html

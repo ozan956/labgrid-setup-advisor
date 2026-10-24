@@ -114,6 +114,26 @@ substitute for switching an unrelated external DC input.
 When exported, it becomes `NetworkYKUSHPowerPort` and the command runs through
 the exporter host's SSH command prefix.
 
+## Components used by the additional workflows
+
+The later advisor workflows reuse the same target, exporter, coordinator, and
+place model with these verified upstream bindings:
+
+| Goal | Resource | Driver |
+| --- | --- | --- |
+| USB serial console | `USBSerialPort`, exported as `NetworkSerialPort` | `SerialDriver` |
+| TCP or RFC2217 console | `NetworkSerialPort` | `SerialDriver` |
+| Linux commands over a console | the serial resources above | `SerialDriver` then `ShellDriver` |
+| OpenOCD flashing | `USBDebugger`, exported as `NetworkUSBDebugger` | `OpenOCDDriver` |
+| USB Fastboot | `AndroidUSBFastboot`, exported as `RemoteAndroidUSBFastboot` | `AndroidFastbootDriver` |
+| USB DFU | `DFUDevice`, exported as `NetworkDFUDevice` | `DFUDriver` |
+
+`OpenOCDDriver` requires board- and probe-specific scripts. Fastboot partition
+names and DFU alternate settings are also target-specific, so the advisor does
+not infer them. Shared testing, CI, remote access, and board-farm workflows use
+`RemotePlace`, coordinator acquisition, place tags, and reservations instead
+of introducing new hardware classes.
+
 ## Configuration validation
 
 `labgrid.environment.Environment` loads an environment YAML file and lazily
@@ -184,4 +204,3 @@ The advisor complements that work without requiring changes to the PR:
 - [`labgrid-suggest` manual](https://labgrid.readthedocs.io/en/latest/man/suggest.html)
 - [`uhubctl` project and compatible hubs](https://github.com/mvp/uhubctl)
 - [Use-case documentation PR #1879](https://github.com/labgrid-project/labgrid/pull/1879)
-

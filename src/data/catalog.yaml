@@ -6,25 +6,24 @@ useCases:
   - id: serial-console-access
     title: Serial Console Access
     description: Select local USB serial or network console resources.
-    status: planned
+    status: available
   - id: firmware-flashing
     title: Firmware Flashing
     description: Match flashing tools and interfaces to a target.
-    status: planned
+    status: available
   - id: automated-hardware-testing
     title: Automated Hardware Testing
     description: Combine target control with pytest workflows.
-    status: planned
+    status: available
   - id: ci-integration
     title: CI Integration
     description: Acquire hardware safely from automated jobs.
-    status: planned
+    status: available
   - id: remote-board-access
     title: Remote Board Access
     description: Connect developers to boards on another host.
-    status: planned
+    status: available
   - id: board-farm-setup
     title: Board Farm Setup
     description: Organize shared resources, places, and reservations.
-    status: planned
-
+    status: available

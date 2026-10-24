@@ -28,8 +28,8 @@ The framework-independent TypeScript engine:
 - reports every unresolved hardware placeholder.
 
 Conditions deliberately support only `all` and `any` lists of simple
-single-choice predicates. That is enough for the first use case and keeps the
-format reviewable. A general rule language is intentionally out of scope.
+single-choice predicates. That is enough for the current workflows and keeps
+the format reviewable. A general rule language is intentionally out of scope.
 
 ## Presentation
 
@@ -41,9 +41,9 @@ stores no data outside component state.
 The UI is a small state flow:
 
 ```text
-landing -> use-case catalog -> question wizard -> recommendations
-                               ^                  |
-                               +------ edit ------+
+landing + use-case catalog -> question wizard -> recommendations
+                              ^                  |
+                              +------ edit ------+
 ```
 
 Changing an earlier answer asks the engine to reconcile the answer set before
@@ -78,10 +78,9 @@ executes generated commands or configurations.
 
 ## Deliberate limits
 
-- One complete use case: remote power control.
+- Seven focused setup workflows, not a complete hardware compatibility matrix.
 - Single-choice questions only.
 - Placeholder templates rather than credential collection.
 - No live hardware probing; `labgrid-suggest` remains the correct local tool.
-- No strategy recommendation for power-only flows because upstream does not
-  require one.
-
+- No generic boot strategy wizard; strategies require board-specific boot-state
+  knowledge beyond the current workflows.

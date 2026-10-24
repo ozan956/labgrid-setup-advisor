@@ -1,0 +1,355 @@
+schemaVersion: 1
+id: automated-hardware-testing
+title: Automated Hardware Testing
+description: Build a pytest-ready Labgrid target for console-level or Linux shell tests.
+
+questions:
+  - id: test-level
+    text: What should the test control?
+    help: Start with the narrowest protocol your test needs; shell automation requires reliable login and prompt expressions.
+    options:
+      - value: console
+        label: Raw serial console I/O
+        description: Tests send and expect bytes without logging into Linux.
+      - value: shell
+        label: Commands in a Linux shell
+        description: Tests log in through the console and run shell commands.
+
+  - id: topology
+    text: Where does the test run relative to the board?
+    help: Shared hardware should be acquired through a coordinator place before pytest starts.
+    options:
+      - value: local
+        label: On the board host
+        description: pytest and the serial adapter are on the same machine.
+      - value: shared
+        label: From another machine or CI runner
+        description: An exporter publishes the board to a coordinator.
+
+recommendations:
+  - id: console-tests
+    category: approach
+    title: Test the ConsoleProtocol through SerialDriver
+    summary: Use pytest's target fixture and activate SerialDriver when byte-oriented console interactions are sufficient.
+    when:
+      all:
+        - question: test-level
+          equals: console
+    why:
+      - SerialDriver exposes ConsoleProtocol without assuming a bootloader or operating-system prompt.
+      - Tests remain explicit about the bytes and timeouts they expect.
+    requirements:
+      hardware:
+        - A correctly wired serial adapter and a stable board console.
+      software:
+        - pytest with Labgrid's pytest plugin.
+    components:
+      - kind: resource
+        name: USBSerialPort / NetworkSerialPort
+        reason: Describes the local or exported board console.
+      - kind: driver
+        name: SerialDriver
+        reason: Implements ConsoleProtocol for pytest fixtures.
+    architecture:
+      - label: pytest
+        detail: Requests the Labgrid target fixture.
+      - label: SerialDriver
+        detail: Provides console send and expect operations.
+      - label: Board
+        detail: Produces deterministic console output for assertions.
+    commands:
+      - command: pytest --lg-env environment.yaml
+        description: Run the suite with the selected Labgrid environment.
+    documentation: [pytest, serial]
+
+  - id: shell-tests
+    category: approach
+    title: Layer ShellDriver over the serial console
+    summary: Bind ShellDriver to SerialDriver and provide target-specific login and shell prompt expressions before running command-level tests.
+    when:
+      all:
+        - question: test-level
+          equals: shell
+    why:
+      - ShellDriver implements CommandProtocol and FileTransferProtocol over a console driver.
+      - Generic prompts are unreliable, so username and regular expressions stay explicit placeholders.
+    requirements:
+      hardware:
+        - A board that reaches a stable interactive shell on the configured console.
+      software:
+        - pytest, Labgrid, and valid login and prompt expressions for the target image.
+    components:
+      - kind: driver
+        name: SerialDriver
+        reason: Supplies ConsoleProtocol to the shell layer.
+      - kind: driver
+        name: ShellDriver
+        reason: Logs in and executes commands for tests.
+    architecture:
+      - label: pytest
+        detail: Requests CommandProtocol or ShellDriver from the target.
+      - label: ShellDriver
+        detail: Logs in and recognizes the configured prompt.
+      - label: Target Linux
+        detail: Executes commands and returns output.
+    commands:
+      - command: pytest --lg-env environment.yaml
+        description: Run the command-level hardware tests.
+    documentation: [pytest, shell]
+
+  - id: local-tests
+    category: topology
+    title: Use a local pytest environment
+    summary: Keep the first test setup local when one host owns the board and no cross-user locking is required.
+    when:
+      all:
+        - question: topology
+          equals: local
+    why:
+      - Local resource configuration has fewer moving parts and is appropriate for a dedicated bench.
+    requirements:
+      hardware: []
+      software:
+        - Local access to the configured serial device.
+    components:
+      - kind: infrastructure
+        name: Labgrid pytest plugin
+        reason: Loads the environment and injects targets into tests.
+    architecture: []
+    commands: []
+    documentation: [pytest]
+
+  - id: shared-tests
+    category: topology
+    title: Acquire the board before starting pytest
+    summary: Publish the board through an exporter and make acquisition and release part of the test-job lifecycle.
+    when:
+      all:
+        - question: topology
+          equals: shared
+    why:
+      - A coordinator prevents developers or jobs from driving the same hardware concurrently.
+      - pytest consumes the same RemotePlace resources after acquisition.
+    requirements:
+      hardware:
+        - A Linux exporter host beside the board.
+      software:
+        - labgrid-coordinator, labgrid-exporter, and reliable cleanup in the test job.
+    components:
+      - kind: resource
+        name: RemotePlace
+        reason: Makes the acquired board resources available to the test target.
+      - kind: infrastructure
+        name: labgrid-coordinator
+        reason: Enforces exclusive place ownership.
+    architecture:
+      - label: Test runner
+        detail: Acquires a place, runs pytest, and releases it.
+      - label: Coordinator
+        detail: Prevents concurrent access.
+      - label: Exporter host
+        detail: Publishes the board console.
+    commands:
+      - command: labgrid-client -p <PLACE_NAME> acquire
+        description: Acquire the board before pytest.
+      - command: pytest --lg-env remote.yaml
+        description: Run tests against the acquired RemotePlace.
+      - command: labgrid-client -p <PLACE_NAME> release
+        description: Release the board in an unconditional cleanup step.
+    documentation: [getting-started, pytest]
+
+configurations:
+  - id: local-console-test
+    title: Local console-test environment
+    filename: environment.yaml
+    kind: environment
+    when:
+      all:
+        - question: test-level
+          equals: console
+        - question: topology
+          equals: local
+    template: |
+      targets:
+        main:
+          resources:
+            RawSerialPort:
+              port: '{{SERIAL_DEVICE}}'
+              speed: {{BAUD_RATE}}
+          drivers:
+            SerialDriver: {}
+    placeholders:
+      - token: SERIAL_DEVICE
+        label: Serial device
+        description: Local tty path; prefer USBSerialPort matching for a long-lived setup.
+        example: /dev/ttyUSB0
+        required: true
+      - token: BAUD_RATE
+        label: Baud rate
+        description: UART speed required by the target.
+        example: '115200'
+        required: true
+
+  - id: local-shell-test
+    title: Local shell-test environment
+    filename: environment.yaml
+    kind: environment
+    when:
+      all:
+        - question: test-level
+          equals: shell
+        - question: topology
+          equals: local
+    template: |
+      targets:
+        main:
+          resources:
+            RawSerialPort:
+              port: '{{SERIAL_DEVICE}}'
+              speed: {{BAUD_RATE}}
+          drivers:
+            SerialDriver: {}
+            ShellDriver:
+              prompt: '{{SHELL_PROMPT}}'
+              login_prompt: '{{LOGIN_PROMPT}}'
+              username: '{{USERNAME}}'
+    placeholders:
+      - token: SERIAL_DEVICE
+        label: Serial device
+        description: Local tty path used by the test host.
+        example: /dev/ttyUSB0
+        required: true
+      - token: BAUD_RATE
+        label: Baud rate
+        description: UART speed required by the target.
+        example: '115200'
+        required: true
+      - token: SHELL_PROMPT
+        label: Shell prompt expression
+        description: Regular expression matching the target's shell prompt.
+        example: 'root@[^:]+:[^ ]+ '
+        required: true
+      - token: LOGIN_PROMPT
+        label: Login prompt expression
+        description: Regular expression matching the login prompt.
+        example: ' login: '
+        required: true
+      - token: USERNAME
+        label: Login username
+        description: Account available on the target image.
+        example: root
+        required: true
+
+  - id: shared-test-exporter
+    title: Shared board exporter resources
+    filename: exporter.yaml
+    kind: exporter
+    when:
+      all:
+        - question: topology
+          equals: shared
+    template: |
+      {{EXPORT_GROUP}}:
+        USBSerialPort:
+          match:
+            ID_SERIAL_SHORT: '{{SERIAL_NUMBER}}'
+          speed: {{BAUD_RATE}}
+    placeholders:
+      - token: EXPORT_GROUP
+        label: Exporter group
+        description: Stable group name for this board.
+        example: board-01
+        required: true
+      - token: SERIAL_NUMBER
+        label: Adapter serial number
+        description: Stable ID_SERIAL_SHORT visible on the exporter host.
+        example: FT123456
+        required: true
+      - token: BAUD_RATE
+        label: Baud rate
+        description: UART speed required by the target.
+        example: '115200'
+        required: true
+
+  - id: shared-console-test
+    title: Shared console-test client environment
+    filename: remote.yaml
+    kind: environment
+    when:
+      all:
+        - question: test-level
+          equals: console
+        - question: topology
+          equals: shared
+    template: |
+      targets:
+        main:
+          resources:
+            RemotePlace:
+              name: '{{PLACE_NAME}}'
+          drivers:
+            SerialDriver: {}
+    placeholders:
+      - token: PLACE_NAME
+        label: Coordinator place
+        description: Acquired place containing the board console.
+        example: board-01
+        required: true
+
+  - id: shared-shell-test
+    title: Shared shell-test client environment
+    filename: remote.yaml
+    kind: environment
+    when:
+      all:
+        - question: test-level
+          equals: shell
+        - question: topology
+          equals: shared
+    template: |
+      targets:
+        main:
+          resources:
+            RemotePlace:
+              name: '{{PLACE_NAME}}'
+          drivers:
+            SerialDriver: {}
+            ShellDriver:
+              prompt: '{{SHELL_PROMPT}}'
+              login_prompt: '{{LOGIN_PROMPT}}'
+              username: '{{USERNAME}}'
+    placeholders:
+      - token: PLACE_NAME
+        label: Coordinator place
+        description: Acquired place containing the board console.
+        example: board-01
+        required: true
+      - token: SHELL_PROMPT
+        label: Shell prompt expression
+        description: Regular expression matching the target's shell prompt.
+        example: 'root@[^:]+:[^ ]+ '
+        required: true
+      - token: LOGIN_PROMPT
+        label: Login prompt expression
+        description: Regular expression matching the login prompt.
+        example: ' login: '
+        required: true
+      - token: USERNAME
+        label: Login username
+        description: Account available on the target image.
+        example: root
+        required: true
+
+documentation:
+  - id: pytest
+    title: Labgrid pytest integration
+    url: https://labgrid.readthedocs.io/en/latest/usage.html
+  - id: serial
+    title: SerialDriver reference
+    url: https://labgrid.readthedocs.io/en/latest/configuration.html#serialdriver
+  - id: shell
+    title: ShellDriver reference
+    url: https://labgrid.readthedocs.io/en/latest/configuration.html#shelldriver
+  - id: getting-started
+    title: Distributed infrastructure tutorial
+    url: https://labgrid.readthedocs.io/en/latest/getting_started.html

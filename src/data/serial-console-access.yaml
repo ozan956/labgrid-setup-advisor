@@ -1,0 +1,342 @@
+schemaVersion: 1
+id: serial-console-access
+title: Serial Console Access
+description: Choose a local or distributed serial-console path and generate the matching Labgrid configuration.
+
+questions:
+  - id: serial-hardware
+    text: How is the serial console exposed?
+    help: Choose the interface Labgrid can reach; voltage-level conversion and board wiring must already be correct.
+    options:
+      - value: usb-adapter
+        label: A USB-to-serial adapter
+        description: A Linux host sees a tty device backed by a USB adapter.
+      - value: network-server
+        label: A TCP or RFC2217 serial server
+        description: The console is already available through a host, port, and supported protocol.
+
+  - id: location
+    text: Where will the console be used?
+    help: Shared or remote USB hardware should be published through an exporter and acquired as a place.
+    options:
+      - value: local
+        label: On this computer
+        description: The Labgrid client can access the adapter or serial server directly.
+      - value: remote
+        label: Through a remote lab host
+        description: An exporter publishes the console through the coordinator.
+
+recommendations:
+  - id: usb-serial
+    category: approach
+    title: Match the USB adapter with USBSerialPort
+    summary: Use a stable udev property instead of relying on a changing /dev/ttyUSB number, then bind SerialDriver.
+    when:
+      all:
+        - question: serial-hardware
+          equals: usb-adapter
+    why:
+      - USBSerialPort follows the adapter through udev and supplies SerialDriver with its current device node.
+      - The exporter translates it to NetworkSerialPort for remote clients.
+    requirements:
+      hardware:
+        - A correctly wired UART adapter with voltage levels compatible with the target.
+      software:
+        - Labgrid and pyserial on the host using the adapter.
+        - ser2net on an exporter host for remote serial access.
+    components:
+      - kind: resource
+        name: USBSerialPort / NetworkSerialPort
+        reason: Identifies the local USB adapter and its exported network representation.
+      - kind: driver
+        name: SerialDriver
+        reason: Implements ConsoleProtocol over the selected serial resource.
+    architecture:
+      - label: Labgrid client
+        detail: Opens the console through SerialDriver.
+      - label: Serial adapter
+        detail: Converts USB to the board's electrically compatible UART.
+      - label: Target UART
+        detail: Exposes boot and runtime console traffic.
+    commands:
+      - command: labgrid-suggest
+        description: Discover a stable ID_SERIAL_SHORT or ID_PATH for the adapter.
+    documentation: [configuration, suggest]
+
+  - id: network-serial
+    category: approach
+    title: Describe the endpoint with NetworkSerialPort
+    summary: Configure the serial server's host, TCP port, speed, and either raw or RFC2217 protocol, then use SerialDriver.
+    when:
+      all:
+        - question: serial-hardware
+          equals: network-server
+    why:
+      - NetworkSerialPort is the upstream resource for raw TCP and RFC2217 serial endpoints.
+      - SerialDriver applies the configured line speed and opens the network connection.
+    requirements:
+      hardware:
+        - A serial server connected with the correct UART voltage, pinout, and flow-control settings.
+      software:
+        - Network reachability from the Labgrid client or exporter.
+    components:
+      - kind: resource
+        name: NetworkSerialPort
+        reason: Stores the endpoint host, port, speed, and protocol.
+      - kind: driver
+        name: SerialDriver
+        reason: Implements ConsoleProtocol for the network endpoint.
+    architecture:
+      - label: Labgrid client
+        detail: Connects using raw TCP or RFC2217.
+      - label: Serial server
+        detail: Bridges the network connection to the target UART.
+      - label: Target UART
+        detail: Carries the console stream.
+    commands: []
+    documentation: [configuration]
+
+  - id: local-console
+    category: topology
+    title: Keep the console local
+    summary: No coordinator or exporter is needed when one machine can directly reach the serial resource and exclusive sharing is unnecessary.
+    when:
+      all:
+        - question: location
+          equals: local
+    why:
+      - Local resources can be declared directly in the target environment.
+    requirements:
+      hardware: []
+      software:
+        - microcom is useful for interactive labgrid-client console access.
+    components:
+      - kind: infrastructure
+        name: Local environment file
+        reason: Defines the serial resource and driver on one machine.
+    architecture: []
+    commands:
+      - command: labgrid-client -c environment.yaml console
+        description: Open the configured console interactively.
+    documentation: [client]
+
+  - id: remote-console
+    category: topology
+    title: Publish the console through an exporter
+    summary: Put the exporter beside the adapter or endpoint, assign its resource group to a coordinator place, and acquire that place before use.
+    when:
+      all:
+        - question: location
+          equals: remote
+    why:
+      - The coordinator provides discovery and exclusive acquisition while the exporter exposes the hardware-side console.
+    requirements:
+      hardware:
+        - A Linux exporter host with access to the serial interface.
+      software:
+        - labgrid-exporter, labgrid-coordinator, ser2net, and passwordless SSH where required.
+    components:
+      - kind: infrastructure
+        name: labgrid-exporter and labgrid-coordinator
+        reason: Publish the resource and control exclusive access.
+      - kind: resource
+        name: RemotePlace
+        reason: Expands the acquired place into its exported serial resource.
+    architecture:
+      - label: Developer
+        detail: Acquires a place and requests the console.
+      - label: Coordinator
+        detail: Allocates the matching place.
+      - label: Exporter
+        detail: Publishes the serial resource beside the hardware.
+    commands:
+      - command: labgrid-client -p <PLACE_NAME> acquire
+        description: Acquire exclusive access before opening the console.
+      - command: labgrid-client -p <PLACE_NAME> console
+        description: Connect to the exported serial console.
+      - command: labgrid-client -p <PLACE_NAME> release
+        description: Release the place when finished.
+    documentation: [getting-started, client, exporter]
+
+configurations:
+  - id: local-usb-serial
+    title: Local USB serial environment
+    filename: environment.yaml
+    kind: environment
+    when:
+      all:
+        - question: serial-hardware
+          equals: usb-adapter
+        - question: location
+          equals: local
+    template: |
+      targets:
+        main:
+          resources:
+            USBSerialPort:
+              match:
+                ID_SERIAL_SHORT: '{{SERIAL_NUMBER}}'
+              speed: {{BAUD_RATE}}
+          drivers:
+            SerialDriver: {}
+    placeholders:
+      - token: SERIAL_NUMBER
+        label: Adapter serial number
+        description: Stable ID_SERIAL_SHORT reported by udev or labgrid-suggest.
+        example: FT123456
+        required: true
+      - token: BAUD_RATE
+        label: Baud rate
+        description: UART speed required by the board console.
+        example: '115200'
+        required: true
+
+  - id: local-network-serial
+    title: Local network serial environment
+    filename: environment.yaml
+    kind: environment
+    when:
+      all:
+        - question: serial-hardware
+          equals: network-server
+        - question: location
+          equals: local
+    template: |
+      targets:
+        main:
+          resources:
+            NetworkSerialPort:
+              host: '{{SERIAL_HOST}}'
+              port: {{SERIAL_PORT}}
+              speed: {{BAUD_RATE}}
+              protocol: raw
+          drivers:
+            SerialDriver: {}
+    placeholders:
+      - token: SERIAL_HOST
+        label: Serial server host
+        description: DNS name or address reachable by the client.
+        example: console.example.org
+        required: true
+      - token: SERIAL_PORT
+        label: TCP port
+        description: Port exposed by the serial server.
+        example: '7001'
+        required: true
+      - token: BAUD_RATE
+        label: Baud rate
+        description: UART speed required by the board console.
+        example: '115200'
+        required: true
+
+  - id: remote-usb-serial-exporter
+    title: USB serial exporter resources
+    filename: exporter.yaml
+    kind: exporter
+    when:
+      all:
+        - question: serial-hardware
+          equals: usb-adapter
+        - question: location
+          equals: remote
+    template: |
+      {{EXPORT_GROUP}}:
+        USBSerialPort:
+          match:
+            ID_SERIAL_SHORT: '{{SERIAL_NUMBER}}'
+          speed: {{BAUD_RATE}}
+    placeholders:
+      - token: EXPORT_GROUP
+        label: Exporter group
+        description: Stable group name for this board.
+        example: board-01
+        required: true
+      - token: SERIAL_NUMBER
+        label: Adapter serial number
+        description: Stable ID_SERIAL_SHORT visible on the exporter host.
+        example: FT123456
+        required: true
+      - token: BAUD_RATE
+        label: Baud rate
+        description: UART speed required by the board console.
+        example: '115200'
+        required: true
+
+  - id: remote-network-serial-exporter
+    title: Network serial exporter resources
+    filename: exporter.yaml
+    kind: exporter
+    when:
+      all:
+        - question: serial-hardware
+          equals: network-server
+        - question: location
+          equals: remote
+    template: |
+      {{EXPORT_GROUP}}:
+        NetworkSerialPort:
+          host: '{{SERIAL_HOST}}'
+          port: {{SERIAL_PORT}}
+          speed: {{BAUD_RATE}}
+          protocol: raw
+    placeholders:
+      - token: EXPORT_GROUP
+        label: Exporter group
+        description: Stable group name for this board.
+        example: board-01
+        required: true
+      - token: SERIAL_HOST
+        label: Serial server host
+        description: Address reachable by the exporter and clients according to site routing.
+        example: console.example.org
+        required: true
+      - token: SERIAL_PORT
+        label: TCP port
+        description: Port exposed by the serial server.
+        example: '7001'
+        required: true
+      - token: BAUD_RATE
+        label: Baud rate
+        description: UART speed required by the board console.
+        example: '115200'
+        required: true
+
+  - id: remote-serial-client
+    title: Remote console client environment
+    filename: remote.yaml
+    kind: environment
+    when:
+      all:
+        - question: location
+          equals: remote
+    template: |
+      targets:
+        main:
+          resources:
+            RemotePlace:
+              name: '{{PLACE_NAME}}'
+          drivers:
+            SerialDriver: {}
+    placeholders:
+      - token: PLACE_NAME
+        label: Coordinator place
+        description: Place matched to the exported serial resource.
+        example: board-01
+        required: true
+
+documentation:
+  - id: configuration
+    title: Serial resources and SerialDriver
+    url: https://labgrid.readthedocs.io/en/latest/configuration.html
+  - id: suggest
+    title: labgrid-suggest manual
+    url: https://labgrid.readthedocs.io/en/latest/man/suggest.html
+  - id: getting-started
+    title: Distributed infrastructure tutorial
+    url: https://labgrid.readthedocs.io/en/latest/getting_started.html
+  - id: client
+    title: labgrid-client manual
+    url: https://labgrid.readthedocs.io/en/latest/man/client.html
+  - id: exporter
+    title: labgrid-exporter manual
+    url: https://labgrid.readthedocs.io/en/latest/man/exporter.html

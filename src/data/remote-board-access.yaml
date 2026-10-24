@@ -1,0 +1,271 @@
+schemaVersion: 1
+id: remote-board-access
+title: Remote Board Access
+description: Give developers safe remote access to a board console or Linux shell through Labgrid's distributed infrastructure.
+
+questions:
+  - id: access-level
+    text: What should remote users access?
+    help: A shell adds login and prompt handling on top of the serial console.
+    options:
+      - value: console
+        label: The serial console
+        description: Users need interactive boot and runtime console access.
+      - value: shell
+        label: A Linux shell
+        description: Users or tools need authenticated command execution after boot.
+
+  - id: sharing
+    text: Who will use the board?
+    help: Both choices use acquisition; reservations become valuable when several users compete for equivalent boards.
+    options:
+      - value: named-users
+        label: A small team sharing one board
+        description: Everyone acquires the same named place before use.
+      - value: pooled-users
+        label: Many users sharing equivalent boards
+        description: Tags and reservations allocate any compatible free place.
+
+recommendations:
+  - id: remote-console-access
+    category: approach
+    title: Export the USB serial adapter and use SerialDriver
+    summary: Run an exporter beside the board, add its resource group to a coordinator place, and require developers to acquire the place before opening the console.
+    when:
+      all:
+        - question: access-level
+          equals: console
+    why:
+      - USBSerialPort is discovered on the exporter and exposed to clients as NetworkSerialPort.
+      - SerialDriver provides the same ConsoleProtocol locally and remotely.
+    requirements:
+      hardware:
+        - A correctly wired USB-to-serial adapter attached to the exporter host.
+      software:
+        - labgrid-exporter, labgrid-coordinator, ser2net, and microcom or telnet on client machines.
+    components:
+      - kind: resource
+        name: USBSerialPort / NetworkSerialPort
+        reason: Identifies and exports the board console.
+      - kind: driver
+        name: SerialDriver
+        reason: Provides interactive ConsoleProtocol access.
+      - kind: resource
+        name: RemotePlace
+        reason: Loads the resources assigned to the acquired board place.
+    architecture:
+      - label: Developer
+        detail: Acquires a place and opens the console.
+      - label: Coordinator
+        detail: Enforces exclusive access.
+      - label: Exporter host
+        detail: Publishes the physical USB serial adapter.
+      - label: Board
+        detail: Exposes its UART console.
+    commands:
+      - command: labgrid-client -p <PLACE_NAME> acquire
+        description: Acquire the board before opening its console.
+      - command: labgrid-client -p <PLACE_NAME> console
+        description: Open the exported console.
+      - command: labgrid-client -p <PLACE_NAME> release
+        description: Release the board when finished.
+    documentation: [getting-started, client]
+
+  - id: remote-shell-access
+    category: approach
+    title: Add ShellDriver above the remote console
+    summary: Configure target-specific login and prompt expressions so developers and scripts can run commands through CommandProtocol.
+    when:
+      all:
+        - question: access-level
+          equals: shell
+    why:
+      - ShellDriver binds to SerialDriver and handles login, prompts, commands, and file transfer.
+      - Prompt expressions depend on the target image and must remain explicit.
+    requirements:
+      hardware:
+        - A board that boots to a stable login prompt on the exported console.
+      software:
+        - Valid login credentials and prompt expressions for the deployed image.
+    components:
+      - kind: driver
+        name: SerialDriver
+        reason: Supplies ConsoleProtocol over the remote serial resource.
+      - kind: driver
+        name: ShellDriver
+        reason: Implements command and file-transfer protocols after login.
+    architecture:
+      - label: Developer or script
+        detail: Requests a shell command through Labgrid.
+      - label: ShellDriver
+        detail: Logs in over SerialDriver and recognizes the target prompt.
+      - label: Board Linux
+        detail: Executes commands on the acquired board.
+    commands:
+      - command: pytest --lg-env remote.yaml
+        description: Use ShellDriver from a test or Python client after acquiring the place.
+    documentation: [shell, client]
+
+  - id: named-board-sharing
+    category: topology
+    title: Use one stable place per physical board
+    summary: Match the exporter group to a named place and teach the team to acquire and release it around every session.
+    when:
+      all:
+        - question: sharing
+          equals: named-users
+    why:
+      - A fixed place name makes one-off developer access easy to understand.
+    requirements:
+      hardware: []
+      software:
+        - Coordinator access for every developer identity.
+    components:
+      - kind: infrastructure
+        name: Coordinator place
+        reason: Groups the board's exported resources and ownership state.
+    architecture: []
+    commands:
+      - command: labgrid-client --place <PLACE_NAME> create
+        description: Create the place once during lab setup.
+      - command: labgrid-client -p <PLACE_NAME> add-match '*/<EXPORT_GROUP>/*'
+        description: Assign the board's exporter group to the place.
+    documentation: [getting-started]
+
+  - id: pooled-board-sharing
+    category: topology
+    title: Tag equivalent places and use reservations
+    summary: Apply capability tags to places so users can reserve any compatible free board instead of waiting for one named unit.
+    when:
+      all:
+        - question: sharing
+          equals: pooled-users
+    why:
+      - Reservations provide fair allocation without hard-coding a single board name.
+    requirements:
+      hardware:
+        - Multiple places with genuinely equivalent hardware and capabilities.
+      software:
+        - Consistent coordinator tags maintained by lab operators.
+    components:
+      - kind: infrastructure
+        name: Coordinator reservations
+        reason: Queue and allocate matching places to users.
+    architecture: []
+    commands:
+      - command: labgrid-client reserve --wait board=<BOARD_TAG>
+        description: Wait for any compatible tagged place.
+    documentation: [reservations]
+
+configurations:
+  - id: remote-board-exporter
+    title: Remote board exporter resources
+    filename: exporter.yaml
+    kind: exporter
+    when:
+      any:
+        - question: access-level
+          equals: console
+        - question: access-level
+          equals: shell
+    template: |
+      {{EXPORT_GROUP}}:
+        USBSerialPort:
+          match:
+            ID_SERIAL_SHORT: '{{SERIAL_NUMBER}}'
+          speed: {{BAUD_RATE}}
+    placeholders:
+      - token: EXPORT_GROUP
+        label: Exporter group
+        description: Stable hardware-side group name for this board.
+        example: board-01
+        required: true
+      - token: SERIAL_NUMBER
+        label: Adapter serial number
+        description: Stable ID_SERIAL_SHORT visible on the exporter host.
+        example: FT123456
+        required: true
+      - token: BAUD_RATE
+        label: Baud rate
+        description: UART speed required by the board.
+        example: '115200'
+        required: true
+
+  - id: remote-console-client
+    title: Remote console client environment
+    filename: remote.yaml
+    kind: environment
+    when:
+      all:
+        - question: access-level
+          equals: console
+    template: |
+      targets:
+        main:
+          resources:
+            RemotePlace:
+              name: '{{PLACE_NAME}}'
+          drivers:
+            SerialDriver: {}
+    placeholders:
+      - token: PLACE_NAME
+        label: Coordinator place
+        description: Place containing the board's exported resources.
+        example: board-01
+        required: true
+
+  - id: remote-shell-client
+    title: Remote shell client environment
+    filename: remote.yaml
+    kind: environment
+    when:
+      all:
+        - question: access-level
+          equals: shell
+    template: |
+      targets:
+        main:
+          resources:
+            RemotePlace:
+              name: '{{PLACE_NAME}}'
+          drivers:
+            SerialDriver: {}
+            ShellDriver:
+              prompt: '{{SHELL_PROMPT}}'
+              login_prompt: '{{LOGIN_PROMPT}}'
+              username: '{{USERNAME}}'
+    placeholders:
+      - token: PLACE_NAME
+        label: Coordinator place
+        description: Place containing the board's exported resources.
+        example: board-01
+        required: true
+      - token: SHELL_PROMPT
+        label: Shell prompt expression
+        description: Regular expression matching the target shell prompt.
+        example: 'root@[^:]+:[^ ]+ '
+        required: true
+      - token: LOGIN_PROMPT
+        label: Login prompt expression
+        description: Regular expression matching the target login prompt.
+        example: ' login: '
+        required: true
+      - token: USERNAME
+        label: Login username
+        description: Account available on the target image.
+        example: root
+        required: true
+
+documentation:
+  - id: getting-started
+    title: Distributed infrastructure tutorial
+    url: https://labgrid.readthedocs.io/en/latest/getting_started.html
+  - id: client
+    title: labgrid-client manual
+    url: https://labgrid.readthedocs.io/en/latest/man/client.html
+  - id: shell
+    title: ShellDriver reference
+    url: https://labgrid.readthedocs.io/en/latest/configuration.html#shelldriver
+  - id: reservations
+    title: Places, tags, and reservations
+    url: https://labgrid.readthedocs.io/en/latest/usage.html#places-and-reservations
