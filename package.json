@@ -12,6 +12,7 @@
     "validate:labgrid": "node scripts/validate-labgrid-configs.mjs"
   },
   "dependencies": {
+    "@fontsource/barlow": "^5.2.8",
     "ajv": "^8.17.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
