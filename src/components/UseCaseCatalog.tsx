@@ -12,14 +12,14 @@ export function UseCaseCatalog({ entries, onSelect }: Props) {
   return (
     <section id="use-cases" className="catalog-page">
       <h2>Choose a setup</h2>
-      <p className="page-intro">Start with the outcome. The advisor will map it to verified Labgrid building blocks.</p>
+      <p className="page-intro">Pick the outcome closest to what you need. You do not need to know Labgrid class names.</p>
       <div className="use-case-grid">
         {available.map((entry) => (
           <article className="use-case-card" key={entry.id}>
             <h2>{entry.title}</h2>
             <p>{entry.description}</p>
             <button className="card-action" aria-label={`Open ${entry.title} guide`} onClick={() => onSelect(entry.id)}>
-              Open guide <Icon name="arrow" />
+              Start setup <Icon name="arrow" />
             </button>
           </article>
         ))}

@@ -39,12 +39,12 @@ export function Wizard({
   return (
     <main id="main-content" className="wizard-page page-shell">
       <div className="wizard-topline">
-        <button className="text-button" onClick={onExit}>← All use cases</button>
+        <button className="text-button" onClick={onExit}>← All setups</button>
         <span>{definition.title}</span>
       </div>
       <div className="progress-wrap" aria-label={`Question ${safeIndex + 1} of ${visible.length}`}>
         <div className="progress-copy">
-          <span>Question {safeIndex + 1}</span>
+          <span>Step {safeIndex + 1}</span>
           <span>{visible.length} total</span>
         </div>
         <div className="progress-track">
@@ -55,6 +55,7 @@ export function Wizard({
       <section className="question-panel">
         <h1 ref={headingRef} tabIndex={-1}>{question.text}</h1>
         <p className="question-help">{question.help}</p>
+        <p className="wizard-hint">Choose the closest answer. You can come back and change it.</p>
         <div className="option-list" role="group" aria-label={question.text}>
           {question.options.map((option) => {
             const active = selected === option.value;
@@ -85,7 +86,7 @@ export function Wizard({
           disabled={!selected}
           onClick={() => lastQuestion ? onComplete() : onIndexChange(safeIndex + 1)}
         >
-          {lastQuestion ? 'Show my setup' : 'Next'} <Icon name="arrow" />
+          {lastQuestion ? 'See recommendation' : 'Continue'} <Icon name="arrow" />
         </button>
       </nav>
     </main>

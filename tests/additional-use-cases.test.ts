@@ -23,8 +23,10 @@ describe('additional setup workflows', () => {
     const engine = new DecisionEngine(definition);
     let answers = {};
 
-    for (const question of engine.visibleQuestions(answers)) {
+    let question = engine.nextQuestion(answers);
+    while (question) {
       answers = engine.setAnswer(answers, question.id, question.options[0].value);
+      question = engine.nextQuestion(answers);
     }
 
     expect(engine.answerStatus(answers).complete).toBe(true);

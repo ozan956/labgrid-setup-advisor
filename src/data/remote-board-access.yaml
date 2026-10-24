@@ -6,7 +6,7 @@ description: Give developers safe remote access to a board console or Linux shel
 questions:
   - id: access-level
     text: What should remote users access?
-    help: A shell adds login and prompt handling on top of the serial console.
+    help: Choose the lowest level of access people actually need.
     options:
       - value: console
         label: The serial console
@@ -17,20 +17,20 @@ questions:
 
   - id: sharing
     text: Who will use the board?
-    help: Both choices use acquisition; reservations become valuable when several users compete for equivalent boards.
+    help: This tells Labgrid whether people select one known board or ask for any available compatible board.
     options:
       - value: named-users
         label: A small team sharing one board
-        description: Everyone acquires the same named place before use.
+        description: Everyone reserves the same known board before using it.
       - value: pooled-users
         label: Many users sharing equivalent boards
-        description: Tags and reservations allocate any compatible free place.
+        description: Labgrid finds a free board using labels such as model or capability.
 
 recommendations:
   - id: remote-console-access
     category: approach
-    title: Export the USB serial adapter and use SerialDriver
-    summary: Run an exporter beside the board, add its resource group to a coordinator place, and require developers to acquire the place before opening the console.
+    title: Share the board's serial console
+    summary: Run Labgrid on the computer connected to the board and require developers to reserve the board before opening its console.
     when:
       all:
         - question: access-level
@@ -73,8 +73,8 @@ recommendations:
 
   - id: remote-shell-access
     category: approach
-    title: Add ShellDriver above the remote console
-    summary: Configure target-specific login and prompt expressions so developers and scripts can run commands through CommandProtocol.
+    title: Allow remote Linux shell commands
+    summary: Tell Labgrid how to recognize the board's login and shell prompts so people and tests can run commands safely.
     when:
       all:
         - question: access-level
@@ -108,8 +108,8 @@ recommendations:
 
   - id: named-board-sharing
     category: topology
-    title: Use one stable place per physical board
-    summary: Match the exporter group to a named place and teach the team to acquire and release it around every session.
+    title: Give the board one stable name
+    summary: Ask every user to reserve that named board before a session and release it afterward.
     when:
       all:
         - question: sharing
@@ -134,8 +134,8 @@ recommendations:
 
   - id: pooled-board-sharing
     category: topology
-    title: Tag equivalent places and use reservations
-    summary: Apply capability tags to places so users can reserve any compatible free board instead of waiting for one named unit.
+    title: Let users reserve any compatible free board
+    summary: Label equivalent boards by capability so users do not have to wait for one specific board.
     when:
       all:
         - question: sharing

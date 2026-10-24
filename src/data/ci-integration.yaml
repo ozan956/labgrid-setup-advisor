@@ -5,32 +5,32 @@ description: Acquire shared hardware safely from a CI job, run Labgrid tests, an
 
 questions:
   - id: allocation
-    text: How should the CI job select hardware?
-    help: A fixed place is simple; a tagged pool lets the coordinator allocate any compatible free board.
+    text: Does the job need one exact board or any compatible board?
+    help: Use one exact board for a simple setup. Use a compatible pool when several equivalent boards are available.
     options:
       - value: fixed-place
-        label: One named place
+        label: Always the same board
         description: The job always targets a known board such as board-01.
       - value: tagged-pool
-        label: Any board matching tags
-        description: A reservation selects an available place from a compatible pool.
+        label: Any compatible free board
+        description: Labgrid finds an available board using labels such as model or capability.
 
   - id: workload
     text: What will the job run?
-    help: Both paths require acquisition before the workload and unconditional cleanup afterward.
+    help: Choose a full pytest suite or a small set of direct Labgrid commands.
     options:
       - value: pytest
         label: A pytest hardware suite
-        description: Tests use Labgrid's pytest target fixture and environment file.
+        description: Run repeatable Python tests that use Labgrid's pytest integration.
       - value: client-command
-        label: Labgrid client commands
-        description: The job runs a focused power, console, digital-I/O, or strategy action.
+        label: A few direct Labgrid commands
+        description: Run a focused power, console, digital-I/O, or strategy action.
 
 recommendations:
   - id: fixed-ci-place
     category: approach
-    title: Acquire one named place in the job
-    summary: Use a stable place name when the pipeline is intentionally tied to one physical setup.
+    title: Reserve the same board for every job
+    summary: Give the board a stable name, reserve it when the job starts, and release it even when the job fails.
     when:
       all:
         - question: allocation
@@ -66,8 +66,8 @@ recommendations:
 
   - id: pooled-ci-place
     category: approach
-    title: Reserve a compatible board by tag
-    summary: Tag equivalent places, reserve with --wait and --shell, then address the allocated place through the LG_RESERVATION expansion.
+    title: Let Labgrid find any compatible free board
+    summary: Label equivalent boards by capability and wait until one can be reserved for the job.
     when:
       all:
         - question: allocation
@@ -107,8 +107,8 @@ recommendations:
 
   - id: pytest-ci
     category: topology
-    title: Run pytest against the acquired RemotePlace
-    summary: Keep the Labgrid environment in the repository and pass it to pytest only after hardware acquisition succeeds.
+    title: Run pytest after the board is reserved
+    summary: Keep the Labgrid test configuration in the repository and start pytest only after the job has exclusive board access.
     when:
       all:
         - question: workload
@@ -132,7 +132,7 @@ recommendations:
 
   - id: command-ci
     category: topology
-    title: Run one explicit labgrid-client action
+    title: Run a small set of direct Labgrid commands
     summary: Use client commands for small smoke operations, while keeping acquisition and cleanup identical to a full test job.
     when:
       all:

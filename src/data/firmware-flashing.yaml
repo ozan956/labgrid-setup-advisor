@@ -17,23 +17,54 @@ questions:
       - value: dfu
         label: USB DFU
         description: The target exposes a standards-based Device Firmware Upgrade interface.
+      - value: unknown
+        label: I am not sure yet
+        description: I have a firmware image, but do not know which programming interface the board supports.
 
   - id: location
     text: Where is the flashing interface connected?
     help: USB tools must run on the host physically connected to the interface.
+    visibleWhen:
+      any:
+        - question: flash-method
+          equals: openocd
+        - question: flash-method
+          equals: fastboot
+        - question: flash-method
+          equals: dfu
     options:
       - value: local
         label: This computer
         description: The debug probe or USB device is attached locally.
       - value: remote
-        label: A remote exporter host
-        description: The interface is published through a coordinator place.
+        label: Another computer in the lab
+        description: The flashing cable is connected to a different Linux computer on the network.
 
 recommendations:
+  - id: identify-flash-method
+    category: warning
+    title: Check the board's supported flashing method first
+    summary: Find the board vendor's flashing or recovery instructions before choosing a Labgrid driver.
+    when:
+      all:
+        - question: flash-method
+          equals: unknown
+    why:
+      - JTAG or SWD, Fastboot, and DFU are different interfaces and cannot be substituted for one another.
+      - The board documentation should name the required cable, mode, tool, and image format.
+    requirements:
+      hardware:
+        - The exact board model and its vendor documentation.
+      software: []
+    components: []
+    architecture: []
+    commands: []
+    documentation: [configuration]
+
   - id: openocd-flashing
     category: approach
-    title: Flash through USBDebugger and OpenOCDDriver
-    summary: Identify a supported USB debug probe with USBDebugger and provide board-specific OpenOCD configuration to OpenOCDDriver.
+    title: Flash with OpenOCD and the debug probe
+    summary: Identify the USB debug probe and use the interface and board files recommended for your exact target.
     when:
       all:
         - question: flash-method
@@ -68,8 +99,8 @@ recommendations:
 
   - id: fastboot-flashing
     category: approach
-    title: Flash with AndroidUSBFastboot and AndroidFastbootDriver
-    summary: Match the target only while it is in USB Fastboot mode, then use AndroidFastbootDriver for explicit boot, flash, erase, or continue operations.
+    title: Flash while the board is in Fastboot mode
+    summary: Put the board into its documented USB Fastboot mode, then choose the exact image and partition to write.
     when:
       all:
         - question: flash-method
@@ -101,8 +132,8 @@ recommendations:
 
   - id: dfu-flashing
     category: approach
-    title: Flash with DFUDevice and DFUDriver
-    summary: Match the target in USB DFU mode and use DFUDriver with device-specific alternate setting and image arguments.
+    title: Flash while the board is in USB DFU mode
+    summary: Put the board into its documented DFU mode, then use its required alternate setting and image options.
     when:
       all:
         - question: flash-method
@@ -134,8 +165,8 @@ recommendations:
 
   - id: local-flashing
     category: topology
-    title: Run the flashing tool locally
-    summary: A coordinator is unnecessary when the USB interface and Labgrid process are on one trusted workstation.
+    title: Run the flashing tool on this computer
+    summary: One local configuration is enough when the programming cable is connected to this computer.
     when:
       all:
         - question: location
@@ -156,8 +187,8 @@ recommendations:
 
   - id: remote-flashing
     category: topology
-    title: Run the flashing tool on the exporter host
-    summary: Export the USB interface, acquire its place, and let Labgrid transfer images and execute the selected tool beside the hardware.
+    title: Run the flashing tool on the remote lab computer
+    summary: Reserve the board, transfer the image, and run the selected tool on the computer physically connected to the programming cable.
     when:
       all:
         - question: location

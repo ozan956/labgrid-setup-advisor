@@ -1,36 +1,36 @@
 schemaVersion: 1
 id: board-farm-setup
 title: Board Farm Setup
-description: Organize multiple boards as exporter groups, coordinator places, and reservable capability pools.
+description: Organize multiple boards so developers and CI can reserve them safely.
 
 questions:
   - id: lab-layout
     text: How is the hardware distributed?
-    help: Exporters belong beside physical interfaces; one coordinator can allocate places across several locations.
+    help: Tell us whether every board is on one network or spread across separate lab networks.
     options:
       - value: one-site
         label: One lab or rack area
-        description: One or more exporter hosts share a local hardware network.
+        description: One or more Linux hosts connect the boards to the same lab network.
       - value: multiple-sites
         label: Multiple labs or network locations
-        description: Exporters run at each site and connect to a shared coordinator.
+        description: Each location has a Linux host, while one shared service tracks all boards.
 
   - id: consumers
     text: Who needs the board farm?
-    help: Stable place names suit direct developer access; tagged pools improve automated allocation.
+    help: Developer-only access can stay simple. CI benefits from choosing any free compatible board automatically.
     options:
       - value: developers
         label: Mostly developers
-        description: People select and acquire known board places interactively.
+        description: People select and reserve known boards interactively.
       - value: mixed
         label: Developers and CI jobs
-        description: Interactive access and automated reservations share the same places.
+        description: People and automated jobs reserve boards through the same service.
 
 recommendations:
   - id: farm-foundation
     category: approach
-    title: Model one physical setup as one exporter group and place
-    summary: Keep every board's related resources in a stable exporter group, match that group to one coordinator place, and acquire the place as the unit of ownership.
+    title: Treat each physical setup as one reservable board
+    summary: Keep a board's console, power, and flashing connections together so one reservation owns the complete setup.
     when:
       any:
         - question: lab-layout
@@ -75,8 +75,8 @@ recommendations:
 
   - id: single-site-farm
     category: topology
-    title: Keep exporters close to one lab network
-    summary: Use as many exporter hosts as USB and reliability constraints require, but keep one coordinator as the allocation authority.
+    title: Keep the hardware computers on the lab network
+    summary: Add enough Linux hosts for reliable USB connections, while one shared service tracks who owns each board.
     when:
       all:
         - question: lab-layout
@@ -100,8 +100,8 @@ recommendations:
 
   - id: multisite-farm
     category: topology
-    title: Run an exporter at every hardware location
-    summary: Connect site-local exporters to one reachable coordinator and design SSH, TLS, DNS, and proxy routing before adding boards.
+    title: Connect every lab location to one board registry
+    summary: Put a Linux host beside the hardware at each site and plan secure network access before adding boards.
     when:
       all:
         - question: lab-layout
@@ -133,8 +133,8 @@ recommendations:
 
   - id: developer-farm
     category: topology
-    title: Give every board a clear stable place name
-    summary: Favor discoverable place names and documented labels when developers choose boards interactively.
+    title: Give every board a clear, stable name
+    summary: Use names and physical labels that help developers find the exact board and cable they reserved.
     when:
       all:
         - question: consumers
@@ -157,8 +157,8 @@ recommendations:
 
   - id: mixed-farm
     category: topology
-    title: Add capability tags and reservation pools
-    summary: Keep stable place names for humans, then tag equivalent boards so CI jobs can reserve any compatible unit.
+    title: Label equivalent boards for automatic selection
+    summary: Keep human-friendly board names, then add capability labels so CI can reserve any compatible free board.
     when:
       all:
         - question: consumers

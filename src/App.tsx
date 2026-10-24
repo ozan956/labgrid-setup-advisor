@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { catalog, definitions, type CatalogEntry } from './data';
 import { DecisionEngine } from './engine/decision-engine';
 import type { Answers, UseCaseDefinition } from './engine/types';
@@ -8,6 +8,13 @@ import { UseCaseCatalog } from './components/UseCaseCatalog';
 import { Wizard } from './components/Wizard';
 
 type Screen = 'landing' | 'wizard' | 'results';
+type Theme = 'light' | 'dark';
+
+function preferredTheme(): Theme {
+  const saved = window.localStorage.getItem('labgrid-advisor-theme');
+  if (saved === 'light' || saved === 'dark') return saved;
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
 
 function Landing({ entries, onSelect }: { entries: CatalogEntry[]; onSelect: (id: string) => void }) {
   return (
@@ -16,9 +23,9 @@ function Landing({ entries, onSelect }: { entries: CatalogEntry[]; onSelect: (id
         <h1>Labgrid Setup Advisor</h1>
         <div className="docs-notice" role="note">
           <strong><Icon name="check" /> Deterministic setup guidance</strong>
-          <p>From your hardware and goals to a working Labgrid setup.</p>
+          <p>Answer a few questions. We will explain the parts and generate a configuration you can edit.</p>
         </div>
-        <p>Answer a few concrete questions to get verified resources, drivers, architecture guidance, and configuration templates—without guessing at Labgrid's building blocks.</p>
+        <p>Choose what you want to do. If you do not know a hardware detail yet, say so—the advisor will tell you what to check instead of guessing.</p>
       </section>
 
       <UseCaseCatalog entries={entries} onSelect={onSelect} />
@@ -26,9 +33,9 @@ function Landing({ entries, onSelect }: { entries: CatalogEntry[]; onSelect: (id
       <section className="how-it-works">
         <h2>How it works</h2>
         <div className="how-grid">
-          <div><h3>Describe your goal</h3><p>Start with the outcome you need, not a class name.</p></div>
-          <div><h3>Match real hardware</h3><p>Choose only components supported by upstream Labgrid.</p></div>
-          <div><h3>Leave with YAML</h3><p>Get local, exporter, or client templates for your path.</p></div>
+          <div><h3>Choose a goal</h3><p>Tell us what the board should do. No Labgrid knowledge is needed.</p></div>
+          <div><h3>Answer plain questions</h3><p>Pick what you know. Uncertain choices lead to safe checks, not guesses.</p></div>
+          <div><h3>Get next steps</h3><p>See the recommended method first, then open technical details and YAML when ready.</p></div>
         </div>
       </section>
     </main>
@@ -36,10 +43,20 @@ function Landing({ entries, onSelect }: { entries: CatalogEntry[]; onSelect: (id
 }
 
 export default function App() {
+  const [theme, setTheme] = useState<Theme>(() => {
+    const initial = preferredTheme();
+    document.documentElement.dataset.theme = initial;
+    return initial;
+  });
   const [screen, setScreen] = useState<Screen>('landing');
   const [definition, setDefinition] = useState<UseCaseDefinition>();
   const [answers, setAnswers] = useState<Answers>({});
   const [questionIndex, setQuestionIndex] = useState(0);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem('labgrid-advisor-theme', theme);
+  }, [theme]);
 
   function goHome(): void {
     setScreen('landing');
@@ -76,6 +93,15 @@ export default function App() {
             <span>Hardware automation</span>
           </div>
           <div className="header-meta">
+            <button
+              className="theme-toggle"
+              onClick={() => setTheme((current) => current === 'light' ? 'dark' : 'light')}
+              aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+              aria-pressed={theme === 'dark'}
+              title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+            >
+              <Icon name={theme === 'light' ? 'moon' : 'sun'} />
+            </button>
             <a href="https://github.com/labgrid-project/labgrid" target="_blank" rel="noreferrer">GitHub ↗</a>
             <a href="https://labgrid.readthedocs.io/" target="_blank" rel="noreferrer">Documentation</a>
           </div>

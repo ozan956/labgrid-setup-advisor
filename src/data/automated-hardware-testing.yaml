@@ -6,31 +6,31 @@ description: Build a pytest-ready Labgrid target for console-level or Linux shel
 questions:
   - id: test-level
     text: What should the test control?
-    help: Start with the narrowest protocol your test needs; shell automation requires reliable login and prompt expressions.
+    help: Choose whether the test only watches the console or logs in and runs commands.
     options:
       - value: console
-        label: Raw serial console I/O
-        description: Tests send and expect bytes without logging into Linux.
+        label: Watch boot output or send text
+        description: The test reads and writes the serial console without logging into Linux.
       - value: shell
         label: Commands in a Linux shell
         description: Tests log in through the console and run shell commands.
 
   - id: topology
     text: Where does the test run relative to the board?
-    help: Shared hardware should be acquired through a coordinator place before pytest starts.
+    help: Tell us whether the test machine is physically connected to the board.
     options:
       - value: local
-        label: On the board host
+        label: On the computer connected to the board
         description: pytest and the serial adapter are on the same machine.
       - value: shared
-        label: From another machine or CI runner
-        description: An exporter publishes the board to a coordinator.
+        label: From another computer or CI runner
+        description: Labgrid will share the board over the network and prevent two jobs using it at once.
 
 recommendations:
   - id: console-tests
     category: approach
-    title: Test the ConsoleProtocol through SerialDriver
-    summary: Use pytest's target fixture and activate SerialDriver when byte-oriented console interactions are sufficient.
+    title: Test the serial console directly
+    summary: Use pytest to send text, watch output, and check timeouts without assuming the board has booted Linux.
     when:
       all:
         - question: test-level
@@ -64,8 +64,8 @@ recommendations:
 
   - id: shell-tests
     category: approach
-    title: Layer ShellDriver over the serial console
-    summary: Bind ShellDriver to SerialDriver and provide target-specific login and shell prompt expressions before running command-level tests.
+    title: Log in and run Linux shell commands
+    summary: Tell Labgrid how to recognize the login and shell prompts, then run command-level checks through pytest.
     when:
       all:
         - question: test-level
@@ -99,7 +99,7 @@ recommendations:
 
   - id: local-tests
     category: topology
-    title: Use a local pytest environment
+    title: Run the tests on the connected computer
     summary: Keep the first test setup local when one host owns the board and no cross-user locking is required.
     when:
       all:
@@ -121,8 +121,8 @@ recommendations:
 
   - id: shared-tests
     category: topology
-    title: Acquire the board before starting pytest
-    summary: Publish the board through an exporter and make acquisition and release part of the test-job lifecycle.
+    title: Reserve the board before remote or CI tests
+    summary: Share the board over the network, reserve it before pytest starts, and always release it afterward.
     when:
       all:
         - question: topology

@@ -12,25 +12,57 @@ questions:
         label: A USB-to-serial adapter
         description: A Linux host sees a tty device backed by a USB adapter.
       - value: network-server
-        label: A TCP or RFC2217 serial server
-        description: The console is already available through a host, port, and supported protocol.
+        label: A serial console available over the network
+        description: Someone has given you a host and port for the console.
+      - value: unknown
+        label: I am not sure yet
+        description: I know the board has a serial console, but not which adapter or connection it uses.
 
   - id: location
     text: Where will the console be used?
     help: Shared or remote USB hardware should be published through an exporter and acquired as a place.
+    visibleWhen:
+      any:
+        - question: serial-hardware
+          equals: usb-adapter
+        - question: serial-hardware
+          equals: network-server
     options:
       - value: local
         label: On this computer
         description: The Labgrid client can access the adapter or serial server directly.
       - value: remote
-        label: Through a remote lab host
-        description: An exporter publishes the console through the coordinator.
+        label: On another computer in the lab
+        description: Labgrid will make the connected console available safely over the network.
 
 recommendations:
+  - id: identify-serial-interface
+    category: warning
+    title: Identify the serial connection before configuring Labgrid
+    summary: Check the board manual or ask whoever wired the board whether the console uses a USB adapter or a network serial server.
+    when:
+      all:
+        - question: serial-hardware
+          equals: unknown
+    why:
+      - Labgrid needs to know how the console is physically reached before it can select a safe resource.
+      - UART voltage and pinout must match the board; software cannot determine that safely.
+    requirements:
+      hardware:
+        - The board manual or wiring information for its serial console.
+      software:
+        - Run labgrid-suggest if a USB serial adapter is connected to the Linux host.
+    components: []
+    architecture: []
+    commands:
+      - command: labgrid-suggest
+        description: List USB devices Labgrid may be able to describe.
+    documentation: [suggest]
+
   - id: usb-serial
     category: approach
-    title: Match the USB adapter with USBSerialPort
-    summary: Use a stable udev property instead of relying on a changing /dev/ttyUSB number, then bind SerialDriver.
+    title: Use the USB-to-serial adapter
+    summary: Identify the adapter by its stable hardware information so Linux device-number changes do not break the console.
     when:
       all:
         - question: serial-hardware
@@ -65,8 +97,8 @@ recommendations:
 
   - id: network-serial
     category: approach
-    title: Describe the endpoint with NetworkSerialPort
-    summary: Configure the serial server's host, TCP port, speed, and either raw or RFC2217 protocol, then use SerialDriver.
+    title: Connect to the existing network serial console
+    summary: Enter the serial server's address, port, speed, and protocol so Labgrid can open the console.
     when:
       all:
         - question: serial-hardware
@@ -98,8 +130,8 @@ recommendations:
 
   - id: local-console
     category: topology
-    title: Keep the console local
-    summary: No coordinator or exporter is needed when one machine can directly reach the serial resource and exclusive sharing is unnecessary.
+    title: Run the console from this computer
+    summary: One local configuration is enough when this computer reaches the console and nobody else needs to reserve it.
     when:
       all:
         - question: location
@@ -122,8 +154,8 @@ recommendations:
 
   - id: remote-console
     category: topology
-    title: Publish the console through an exporter
-    summary: Put the exporter beside the adapter or endpoint, assign its resource group to a coordinator place, and acquire that place before use.
+    title: Share the console safely over the lab network
+    summary: Run Labgrid beside the console connection and require users to reserve the board before opening it.
     when:
       all:
         - question: location

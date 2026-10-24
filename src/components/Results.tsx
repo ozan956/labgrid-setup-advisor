@@ -10,6 +10,12 @@ interface Props {
   onRestart: () => void;
 }
 
+const categoryLabels = {
+  approach: 'Recommended method',
+  topology: 'Where it runs',
+  warning: 'Check this first',
+};
+
 export function Results({ definition, answers, onEdit, onRestart }: Props) {
   const engine = new DecisionEngine(definition);
   const matches = engine.recommendations(answers);
@@ -25,9 +31,9 @@ export function Results({ definition, answers, onEdit, onRestart }: Props) {
     <main id="main-content" className="results-page page-shell">
       <section className="results-hero">
         <div>
-          <div className="section-kicker">Recommendation ready</div>
+          <div className="section-kicker">Your next steps</div>
           <h1>Your {definition.title} setup</h1>
-          <p>Built from verified upstream components. Review every placeholder and hardware-specific requirement before using it.</p>
+          <p>Start with the recommendation below. Open technical details only when you need class names, commands, or wiring requirements.</p>
         </div>
         <div className="results-actions">
           <button className="button secondary" onClick={onEdit}>Review answers</button>
@@ -37,54 +43,65 @@ export function Results({ definition, answers, onEdit, onRestart }: Props) {
 
       <section className="result-section" aria-labelledby="approach-heading">
         <div className="result-section-heading">
-          <div><h2 id="approach-heading">Recommended approach</h2><p>All matching guidance is shown; warnings are intentionally prominent.</p></div>
+          <div><h2 id="approach-heading">What to do</h2><p>These steps match your answers. Safety checks stay visible.</p></div>
         </div>
         <div className="recommendation-stack">
           {matches.map(({ recommendation, matchedAnswers }) => (
             <article className={`recommendation-card ${recommendation.category}`} key={recommendation.id}>
-              <div className="recommendation-label">{recommendation.category}</div>
+              <div className="recommendation-label">{categoryLabels[recommendation.category]}</div>
               <h3>{recommendation.title}</h3>
               <p className="recommendation-summary">{recommendation.summary}</p>
-              {matchedAnswers.length > 0 && <p className="answer-trace">Selected because: {matchedAnswers.join(' · ')}</p>}
+              {matchedAnswers.length > 0 && <p className="answer-trace">Based on your answers: {matchedAnswers.join(' · ')}</p>}
 
-              <div className="detail-grid">
-                {recommendation.requirements.hardware.length > 0 && (
-                  <div><h4>Required hardware</h4><ul>{recommendation.requirements.hardware.map((item) => <li key={item}>{item}</li>)}</ul></div>
-                )}
-                {recommendation.requirements.software.length > 0 && (
-                  <div><h4>Required software</h4><ul>{recommendation.requirements.software.map((item) => <li key={item}>{item}</li>)}</ul></div>
-                )}
-              </div>
-
-              {recommendation.components.length > 0 && (
-                <div className="component-list">
-                  {recommendation.components.map((component) => (
-                    <div key={`${component.kind}-${component.name}`}>
-                      <span>{component.kind}</span><strong>{component.name}</strong><p>{component.reason}</p>
+              <details className="technical-details" open={recommendation.category === 'warning'}>
+                <summary>Show why, requirements, Labgrid parts, and commands</summary>
+                <div className="technical-details-body">
+                  {recommendation.why.length > 0 && (
+                    <div className="why-list">
+                      <h4>Why this fits</h4>
+                      <ul>{recommendation.why.map((reason) => <li key={reason}>{reason}</li>)}</ul>
                     </div>
-                  ))}
-                </div>
-              )}
+                  )}
+                  <div className="detail-grid">
+                    {recommendation.requirements.hardware.length > 0 && (
+                      <div><h4>Required hardware</h4><ul>{recommendation.requirements.hardware.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                    )}
+                    {recommendation.requirements.software.length > 0 && (
+                      <div><h4>Required software</h4><ul>{recommendation.requirements.software.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                    )}
+                  </div>
 
-              {recommendation.architecture.length > 0 && (
-                <div className="architecture-flow" aria-label="Architecture overview">
-                  {recommendation.architecture.map((step, index) => (
-                    <div className="architecture-step" key={`${recommendation.id}-${step.label}`}>
-                      <div><strong>{step.label}</strong><span>{step.detail}</span></div>
-                      {index < recommendation.architecture.length - 1 && <Icon name="arrow" />}
+                  {recommendation.components.length > 0 && (
+                    <div className="component-list">
+                      {recommendation.components.map((component) => (
+                        <div key={`${component.kind}-${component.name}`}>
+                          <span>{component.kind}</span><strong>{component.name}</strong><p>{component.reason}</p>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
+                  )}
 
-              {recommendation.commands.length > 0 && (
-                <div className="command-list">
-                  <h4>Relevant commands</h4>
-                  {recommendation.commands.map((item) => (
-                    <div key={item.command}><code>{item.command}</code><span>{item.description}</span></div>
-                  ))}
+                  {recommendation.architecture.length > 0 && (
+                    <div className="architecture-flow" aria-label="Architecture overview">
+                      {recommendation.architecture.map((step, index) => (
+                        <div className="architecture-step" key={`${recommendation.id}-${step.label}`}>
+                          <div><strong>{step.label}</strong><span>{step.detail}</span></div>
+                          {index < recommendation.architecture.length - 1 && <Icon name="arrow" />}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {recommendation.commands.length > 0 && (
+                    <div className="command-list">
+                      <h4>Relevant commands</h4>
+                      {recommendation.commands.map((item) => (
+                        <div key={item.command}><code>{item.command}</code><span>{item.description}</span></div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              )}
+              </details>
             </article>
           ))}
         </div>
@@ -92,25 +109,29 @@ export function Results({ definition, answers, onEdit, onRestart }: Props) {
 
       <section className="result-section" aria-labelledby="config-heading">
         <div className="result-section-heading">
-          <div><h2 id="config-heading">Configuration templates</h2><p>Exporter and client files are separated. Angle-bracket values must be replaced.</p></div>
+          <div><h2 id="config-heading">Configuration (optional)</h2><p>Use these templates when you are ready to configure Labgrid.</p></div>
         </div>
         {configurations.length > 0 ? (
-          <div className="configuration-stack">
-            {configurations.map((configuration) => (
-              <ConfigurationCard key={configuration.definition.id} configuration={configuration} />
-            ))}
-          </div>
+          <details className="configuration-disclosure">
+            <summary>Show {configurations.length} generated YAML {configurations.length === 1 ? 'file' : 'files'}</summary>
+            <p className="configuration-note">Exporter and client files are separate. Replace every marked placeholder before use.</p>
+            <div className="configuration-stack">
+              {configurations.map((configuration) => (
+                <ConfigurationCard key={configuration.definition.id} configuration={configuration} />
+              ))}
+            </div>
+          </details>
         ) : (
           <div className="no-config">
             <strong>No safe configuration generated</strong>
-            <p>This answer combination needs a verified controller or backend before Labgrid YAML can be useful.</p>
+            <p>One more hardware detail is needed before safe YAML can be generated. Follow the check above, then review your answers.</p>
           </div>
         )}
       </section>
 
       <section className="result-section references" aria-labelledby="docs-heading">
         <div className="result-section-heading">
-          <div><h2 id="docs-heading">Upstream references</h2><p>Confirm model-specific details against current Labgrid and hardware documentation.</p></div>
+          <div><h2 id="docs-heading">Learn more</h2><p>Use the upstream documentation to confirm model-specific details.</p></div>
         </div>
         <div className="reference-grid">
           {documentation.map((reference) => (

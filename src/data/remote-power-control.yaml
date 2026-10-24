@@ -76,8 +76,8 @@ questions:
 recommendations:
   - id: generic-usb-power
     category: approach
-    title: Switch the board's USB supply with USBPowerDriver
-    summary: Use a verified per-port power-switching hub. This cuts power on one USB downstream port; it does not switch an external DC input.
+    title: Control power through a compatible USB hub
+    summary: Use a hub verified for per-port power switching. This turns one USB port off and on; it does not control a separate power adapter.
     when:
       all:
         - question: power-load
@@ -118,8 +118,8 @@ recommendations:
 
   - id: ykush-power
     category: approach
-    title: Switch the USB supply with YKUSHPowerDriver
-    summary: Use the dedicated YKUSH resource and driver for a supported Yepkit USB switching hub.
+    title: Control USB power with a Yepkit YKUSH
+    summary: Connect the board to a supported YKUSH port and let Labgrid turn that USB port off and on.
     when:
       all:
         - question: power-load
@@ -157,8 +157,8 @@ recommendations:
 
   - id: network-pdu-power
     category: approach
-    title: Switch the complete outlet with NetworkPowerDriver
-    summary: Put the board's approved external adapter on one supported network PDU outlet and model it as a NetworkPowerPort.
+    title: Control the board's power adapter through the PDU
+    summary: Plug the board's approved adapter into one supported PDU outlet, then let Labgrid switch that complete outlet.
     when:
       all:
         - question: controller
@@ -196,8 +196,8 @@ recommendations:
 
   - id: no-hardware-usb
     category: approach
-    title: Start manually, then choose a verified USB controller
-    summary: Use ManualPowerDriver during evaluation. For automation, add a compatible uhubctl hub or a YKUSH rather than assuming an ordinary hub can switch power.
+    title: Start with manual power control
+    summary: Ask the operator to switch power for now. Add a compatible USB hub or YKUSH later when you need automation.
     when:
       all:
         - question: power-load
@@ -229,8 +229,8 @@ recommendations:
 
   - id: no-hardware-external
     category: approach
-    title: Start manually, then select a supported outlet controller
-    summary: Use ManualPowerDriver until a supported network PDU or properly engineered relay path is available.
+    title: Start with manual outlet control
+    summary: Ask the operator to switch the adapter for now. Add a supported network PDU or engineered relay before automating it.
     when:
       all:
         - question: controller
@@ -265,7 +265,7 @@ recommendations:
 
   - id: incompatible-usb-controller
     category: warning
-    title: This USB controller does not switch the stated load
+    title: This USB controller cannot switch the external adapter
     summary: USBPowerDriver and YKUSHPowerDriver switch downstream USB power. They do not disconnect a separate DC adapter or arbitrary mains-powered devices.
     when:
       all:
@@ -290,7 +290,7 @@ recommendations:
 
   - id: unknown-pdu
     category: warning
-    title: Verify the PDU backend before using a template
+    title: Check that Labgrid supports this exact PDU
     summary: Labgrid does not have a universal network-PDU protocol. Confirm an exact backend or implement one upstream before configuring NetworkPowerPort.
     when:
       all:
@@ -313,7 +313,7 @@ recommendations:
 
   - id: usb-board-on-pdu
     category: warning
-    title: The PDU switches a charger, not the USB port
+    title: The PDU switches the complete adapter outlet
     summary: This is whole-outlet control. Use a manufacturer-approved USB power adapter and do not describe the result as per-port USB switching.
     when:
       all:
@@ -335,8 +335,8 @@ recommendations:
 
   - id: local-topology
     category: topology
-    title: Keep this as a local Labgrid environment
-    summary: A coordinator and exporter are not required when the driver and its hardware or reachable PDU are on the same machine and no shared locking is needed.
+    title: Run the setup from this computer
+    summary: A single local configuration is enough when this computer reaches the controller and nobody else needs to reserve it.
     when:
       all:
         - question: location
@@ -362,8 +362,8 @@ recommendations:
 
   - id: distributed-topology
     category: topology
-    title: Publish the controller through an exporter and coordinator
-    summary: Run the exporter beside the hardware, register a place with the coordinator, and let clients bind normal drivers to the RemotePlace resources.
+    title: Share power control safely over the network
+    summary: Run Labgrid beside the hardware and use its coordination service so remote users or CI jobs cannot control the same board at the same time.
     when:
       any:
         - question: location
