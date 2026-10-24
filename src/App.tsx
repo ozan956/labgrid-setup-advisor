@@ -85,8 +85,7 @@ export default function App() {
       <header className="site-header">
         <div className="header-inner page-shell">
           <button className="brand" onClick={goHome} aria-label="Labgrid Setup Advisor home">
-            <span className="brand-mark"><i /><i /><i /></span>
-            <span>LABGRID</span>
+            <span>Labgrid</span>
           </button>
           <div className="header-context">
             <span className="context-pill">Setup Advisor <Icon name="arrow" /></span>

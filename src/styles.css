@@ -58,7 +58,7 @@
   --shadow: 0 .2rem .7rem rgba(0, 0, 0, .22), 0 0 .0625rem rgba(255, 255, 255, .12);
 }
 
-* { box-sizing: border-box; }
+* { box-sizing: border-box; font-family: var(--font); }
 html { scroll-behavior: smooth; }
 body { margin: 0; min-width: 320px; min-height: 100vh; color: var(--ink); background: var(--background); }
 .app { min-height: 100vh; color: var(--ink); background: var(--background); }
@@ -99,13 +99,9 @@ a { color: inherit; }
   gap: 8px;
   padding: 5px 0;
   cursor: pointer;
-  letter-spacing: .04em;
   font-size: 15px;
   font-weight: 700;
 }
-.brand-mark { width: 22px; height: 22px; display: flex; align-items: center; gap: 2px; }
-.brand-mark i { width: 4px; height: 16px; display: block; background: var(--lime); }
-.brand-mark i:nth-child(2) { height: 22px; }
 .header-context { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 14px; }
 .context-pill { min-height: 40px; padding: 0 12px; border-radius: 7px; display: inline-flex; align-items: center; gap: 5px; color: var(--lime); background: var(--accent-soft); font-weight: 600; }
 .context-pill .icon { width: 14px; }
