@@ -53,7 +53,6 @@ export function Wizard({
       </div>
 
       <section className="question-panel">
-        <div className="question-number">{String(safeIndex + 1).padStart(2, '0')}</div>
         <h1 ref={headingRef} tabIndex={-1}>{question.text}</h1>
         <p className="question-help">{question.help}</p>
         <div className="option-list" role="group" aria-label={question.text}>
@@ -92,4 +91,3 @@ export function Wizard({
     </main>
   );
 }
-

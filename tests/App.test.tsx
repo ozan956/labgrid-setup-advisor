@@ -36,7 +36,7 @@ describe('core user journey', () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(screen.getByRole('button', { name: /find my setup/i }));
-    expect(screen.getAllByText('Planned')).toHaveLength(6);
+    expect(screen.getByText(/planned next: serial console access/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /serial console access/i })).not.toBeInTheDocument();
   });
 });

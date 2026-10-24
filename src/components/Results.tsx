@@ -25,7 +25,6 @@ export function Results({ definition, answers, onEdit, onRestart }: Props) {
     <main id="main-content" className="results-page page-shell">
       <section className="results-hero">
         <div>
-          <span className="success-mark"><Icon name="check" /></span>
           <div className="section-kicker">Recommendation ready</div>
           <h1>Your Labgrid power setup</h1>
           <p>Built from verified upstream components. Review every placeholder and electrical requirement before connecting hardware.</p>
@@ -38,7 +37,6 @@ export function Results({ definition, answers, onEdit, onRestart }: Props) {
 
       <section className="result-section" aria-labelledby="approach-heading">
         <div className="result-section-heading">
-          <span>01</span>
           <div><h2 id="approach-heading">Recommended approach</h2><p>All matching guidance is shown; warnings are intentionally prominent.</p></div>
         </div>
         <div className="recommendation-stack">
@@ -94,7 +92,6 @@ export function Results({ definition, answers, onEdit, onRestart }: Props) {
 
       <section className="result-section" aria-labelledby="config-heading">
         <div className="result-section-heading">
-          <span>02</span>
           <div><h2 id="config-heading">Configuration templates</h2><p>Exporter and client files are separated. Angle-bracket values must be replaced.</p></div>
         </div>
         {configurations.length > 0 ? (
@@ -113,7 +110,6 @@ export function Results({ definition, answers, onEdit, onRestart }: Props) {
 
       <section className="result-section references" aria-labelledby="docs-heading">
         <div className="result-section-heading">
-          <span>03</span>
           <div><h2 id="docs-heading">Upstream references</h2><p>Confirm model-specific details against current Labgrid and hardware documentation.</p></div>
         </div>
         <div className="reference-grid">
@@ -127,4 +123,3 @@ export function Results({ definition, answers, onEdit, onRestart }: Props) {
     </main>
   );
 }
-
