@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { catalog, definitions } from './data';
+import { catalog, definitions, type CatalogEntry } from './data';
 import { DecisionEngine } from './engine/decision-engine';
 import type { Answers, UseCaseDefinition } from './engine/types';
 import { Icon } from './components/Icons';
@@ -7,32 +7,29 @@ import { Results } from './components/Results';
 import { UseCaseCatalog } from './components/UseCaseCatalog';
 import { Wizard } from './components/Wizard';
 
-type Screen = 'landing' | 'catalog' | 'wizard' | 'results';
+type Screen = 'landing' | 'wizard' | 'results';
 
-function Landing({ onStart }: { onStart: () => void }) {
+function Landing({ entries, onSelect }: { entries: CatalogEntry[]; onSelect: (id: string) => void }) {
   return (
-    <main id="main-content">
-      <section className="hero page-shell">
-        <div className="hero-copy">
-          <div className="eyebrow">Deterministic setup guidance</div>
-          <h1>From your hardware and goals to a working <em>Labgrid setup.</em></h1>
-          <p>Answer a few concrete questions. Get verified resources, drivers, architecture guidance, and configuration templates—without guessing at Labgrid's building blocks.</p>
-          <div className="hero-actions">
-            <button className="button primary large" onClick={onStart}>Find My Setup <Icon name="arrow" /></button>
-            <a className="button ghost" href="https://labgrid.readthedocs.io/" target="_blank" rel="noreferrer">Read Labgrid docs</a>
-          </div>
-          <div className="trust-row">
-            <span><Icon name="check" /> Static &amp; private</span>
-            <span><Icon name="check" /> Upstream-verified names</span>
-            <span><Icon name="check" /> No AI or backend</span>
-          </div>
+    <main id="main-content" className="landing-page page-shell">
+      <section className="hero">
+        <h1>Labgrid Setup Advisor</h1>
+        <div className="docs-notice" role="note">
+          <strong><Icon name="check" /> Deterministic setup guidance</strong>
+          <p>From your hardware and goals to a working Labgrid setup.</p>
         </div>
+        <p>Answer a few concrete questions to get verified resources, drivers, architecture guidance, and configuration templates—without guessing at Labgrid's building blocks.</p>
       </section>
 
-      <section className="how-it-works page-shell">
-        <div><h2>Describe the load</h2><p>Start with what receives power, not a class name.</p></div>
-        <div><h2>Match real hardware</h2><p>Only supported, electrically relevant paths qualify.</p></div>
-        <div><h2>Leave with YAML</h2><p>Get separate local, exporter, and client templates.</p></div>
+      <UseCaseCatalog entries={entries} onSelect={onSelect} />
+
+      <section className="how-it-works">
+        <h2>How it works</h2>
+        <div className="how-grid">
+          <div><h3>Describe your goal</h3><p>Start with the outcome you need, not a class name.</p></div>
+          <div><h3>Match real hardware</h3><p>Choose only components supported by upstream Labgrid.</p></div>
+          <div><h3>Leave with YAML</h3><p>Get local, exporter, or client templates for your path.</p></div>
+        </div>
       </section>
     </main>
   );
@@ -68,16 +65,24 @@ export default function App() {
   return (
     <div className="app">
       <a className="skip-link" href="#main-content">Skip to content</a>
-      <header className="site-header page-shell">
-        <button className="brand" onClick={goHome} aria-label="Labgrid Setup Advisor home">
-          <span className="brand-mark"><i /><i /><i /></span>
-          <span>LABGRID <b>SETUP ADVISOR</b></span>
-        </button>
-        <div className="header-meta"><span>OPEN SOURCE</span><a href="https://github.com/labgrid-project/labgrid" target="_blank" rel="noreferrer">Upstream ↗</a></div>
+      <header className="site-header">
+        <div className="header-inner page-shell">
+          <button className="brand" onClick={goHome} aria-label="Labgrid Setup Advisor home">
+            <span className="brand-mark"><i /><i /><i /></span>
+            <span>LABGRID</span>
+          </button>
+          <div className="header-context">
+            <span className="context-pill">Setup Advisor <Icon name="arrow" /></span>
+            <span>Hardware automation</span>
+          </div>
+          <div className="header-meta">
+            <a href="https://github.com/labgrid-project/labgrid" target="_blank" rel="noreferrer">GitHub ↗</a>
+            <a href="https://labgrid.readthedocs.io/" target="_blank" rel="noreferrer">Documentation</a>
+          </div>
+        </div>
       </header>
 
-      {screen === 'landing' && <Landing onStart={() => setScreen('catalog')} />}
-      {screen === 'catalog' && <UseCaseCatalog entries={catalog} onSelect={selectUseCase} />}
+      {screen === 'landing' && <Landing entries={catalog} onSelect={selectUseCase} />}
       {screen === 'wizard' && definition && (
         <Wizard
           definition={definition}
@@ -86,7 +91,7 @@ export default function App() {
           onAnswer={answer}
           onIndexChange={setQuestionIndex}
           onComplete={() => setScreen('results')}
-          onExit={() => setScreen('catalog')}
+          onExit={() => setScreen('landing')}
         />
       )}
       {screen === 'results' && definition && (

@@ -9,8 +9,7 @@ describe('core user journey', () => {
     const writeText = vi.spyOn(navigator.clipboard, 'writeText');
     render(<App />);
 
-    await user.click(screen.getByRole('button', { name: /find my setup/i }));
-    await user.click(screen.getByRole('button', { name: /start guidance/i }));
+    await user.click(screen.getByRole('button', { name: /open remote power control guide/i }));
 
     await user.click(screen.getByRole('button', { name: /board with an external dc adapter/i }));
     await user.click(screen.getByRole('button', { name: /^next/i }));
@@ -32,11 +31,11 @@ describe('core user journey', () => {
     expect(screen.getAllByRole('button', { name: /copied/i })[0]).toBeInTheDocument();
   });
 
-  it('marks future use cases as unavailable', async () => {
+  it('offers every setup workflow from the landing page', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await user.click(screen.getByRole('button', { name: /find my setup/i }));
-    expect(screen.getByText(/planned next: serial console access/i)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /serial console access/i })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /open .* guide/i })).toHaveLength(7);
+    await user.click(screen.getByRole('button', { name: /open serial console access guide/i }));
+    expect(screen.getByRole('heading', { name: /how is the serial console exposed/i })).toBeInTheDocument();
   });
 });
