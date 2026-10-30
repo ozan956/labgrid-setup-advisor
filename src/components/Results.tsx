@@ -20,6 +20,9 @@ export function Results({ definition, answers, onEdit, onRestart }: Props) {
   const engine = new DecisionEngine(definition);
   const matches = engine.recommendations(answers);
   const configurations = engine.configurations(answers);
+  const nextSteps = matches
+    .flatMap(({ recommendation }) => recommendation.nextSteps ?? [])
+    .filter((step, index, steps) => steps.indexOf(step) === index);
   const documentationById = new Map(definition.documentation.map((reference) => [reference.id, reference]));
   const documentation = matches
     .flatMap(({ recommendation }) => recommendation.documentation)
@@ -45,6 +48,12 @@ export function Results({ definition, answers, onEdit, onRestart }: Props) {
         <div className="result-section-heading">
           <div><h2 id="approach-heading">What to do</h2><p>These steps match your answers. Safety checks stay visible.</p></div>
         </div>
+        {nextSteps.length > 0 && (
+          <section className="next-steps" aria-labelledby="next-steps-heading">
+            <h3 id="next-steps-heading">Start here</h3>
+            <ol>{nextSteps.map((step) => <li key={step}>{step}</li>)}</ol>
+          </section>
+        )}
         <div className="recommendation-stack">
           {matches.map(({ recommendation, matchedAnswers }) => (
             <article className={`recommendation-card ${recommendation.category}`} key={recommendation.id}>

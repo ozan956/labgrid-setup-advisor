@@ -4,27 +4,41 @@ title: Remote Power Control
 description: Select a safe power-control method and generate Labgrid templates for a local bench or remote lab.
 
 questions:
-  - id: power-load
-    text: What do you want to control?
-    help: Choose the electrical load being switched, not how the board transfers data.
+  - id: power-source
+    text: How does the board receive power?
+    help: Choose the cable or adapter that actually powers the board. Ignore USB cables used only for data or debugging.
     options:
-      - value: usb-board
-        label: A board powered through USB
-        description: The selected USB port supplies the board's operating power.
+      - value: usb
+        label: Through the USB port I want to switch
+        description: That USB connection supplies the board's operating power, not only data.
       - value: external-adapter
-        label: A board with an external DC adapter
+        label: Through a separate DC adapter
         description: A separate mains adapter supplies the board's DC input.
-      - value: multiple-devices
-        label: Multiple independently powered devices
-        description: Each device needs a separately controlled power channel.
+      - value: unknown
+        label: I am not sure
+        description: Stop before choosing switching hardware and identify the board's real power input first.
+
+  - id: output-count
+    text: How many power outputs should Labgrid control?
+    help: Count the ports or outlets that must be switched independently, not the number of cables connected to a board.
+    options:
+      - value: one
+        label: One board or power channel
+        description: Labgrid controls one USB port, PDU outlet, or manual power action.
+      - value: multiple
+        label: Multiple independent power channels
+        description: Each board or load needs its own separately controlled port, outlet, and Labgrid resource.
 
   - id: controller
-    text: What power-control hardware do you have?
-    help: A normal USB hub is not enough; USB choices must support independent port power switching.
+    text: Which device will switch the power?
+    help: A normal USB hub is not enough. Choose the tested option only if uhubctl can already switch its ports independently.
     options:
       - value: smart-usb-hub
-        label: A compatible USB hub
-        description: A hub verified to support per-port switching with uhubctl.
+        label: A USB hub already tested with uhubctl
+        description: uhubctl can turn each required downstream port off and on independently.
+      - value: untested-usb-hub
+        label: A USB hub I have not tested yet
+        description: Check its per-port power behavior before generating a Labgrid configuration.
       - value: ykush
         label: A Yepkit YKUSH
         description: A supported YKUSH, YKUSH XS, or YKUSH3 device controlled with ykushcmd.
@@ -36,18 +50,18 @@ questions:
         description: Start with manual power or choose hardware matched to the electrical load.
 
   - id: location
-    text: Where is the hardware located?
-    help: Remote and shared hardware benefits from an exporter, coordinator, and named place.
+    text: Who needs to use this setup?
+    help: Choose whether this computer controls the hardware directly, another Linux host provides access, or the setup is shared.
     options:
       - value: local
-        label: Connected to this computer
-        description: Labgrid and any helper tool run on the same Linux machine as the hardware.
+        label: Only me, from this computer
+        description: This computer can reach the power controller directly and runs any required helper tool.
       - value: remote-host
-        label: Connected to another network host
-        description: A remote Linux host is physically connected to the controller.
+        label: Only me, through another Linux host
+        description: A dedicated Linux host beside the hardware makes its controller available to my computer.
       - value: remote-lab
-        label: In a shared hardware lab
-        description: Multiple people or CI jobs need coordinated, exclusive access.
+        label: Several people or CI jobs
+        description: The setup is shared, so Labgrid must prevent two users from controlling the same board at once.
 
   - id: pdu-model
     text: Which network PDU family do you have?
@@ -80,8 +94,8 @@ recommendations:
     summary: Use a hub verified for per-port power switching. This turns one USB port off and on; it does not control a separate power adapter.
     when:
       all:
-        - question: power-load
-          equals: usb-board
+        - question: power-source
+          equals: usb
         - question: controller
           equals: smart-usb-hub
     why:
@@ -114,6 +128,10 @@ recommendations:
         description: List hubs and confirm that the selected hub exposes controllable ports before configuring Labgrid.
       - command: labgrid-suggest
         description: Discover stable udev match candidates; fill in the port index yourself.
+    nextSteps:
+      - Run uhubctl on the computer connected to the hub and confirm that the required port can be switched independently.
+      - Connect only a board whose USB input is within the hub and board electrical limits.
+      - Replace the generated template placeholders with the hub path and downstream port number.
     documentation: [usb-power, suggest, uhubctl]
 
   - id: ykush-power
@@ -122,8 +140,8 @@ recommendations:
     summary: Connect the board to a supported YKUSH port and let Labgrid turn that USB port off and on.
     when:
       all:
-        - question: power-load
-          equals: usb-board
+        - question: power-source
+          equals: usb
         - question: controller
           equals: ykush
     why:
@@ -153,6 +171,10 @@ recommendations:
     commands:
       - command: ykushcmd -l
         description: List connected YKUSH devices and record the serial number.
+    nextSteps:
+      - Run ykushcmd -l on the computer connected to the YKUSH and record its serial number.
+      - Connect the board to a YKUSH port that stays within the published electrical limits.
+      - Replace the generated template placeholders with the YKUSH serial number and port number.
     documentation: [configuration, ykush]
 
   - id: network-pdu-power
@@ -163,6 +185,8 @@ recommendations:
       all:
         - question: controller
           equals: network-pdu
+        - question: power-source
+          in: [usb, external-adapter]
     why:
       - A network PDU is controlled directly over the network and maps to NetworkPowerPort.
       - The selected backend determines the PDU protocol; host and outlet index remain site-specific.
@@ -192,6 +216,10 @@ recommendations:
       - label: Board
         detail: Receives the voltage, polarity, and current specified by its manufacturer.
     commands: []
+    nextSteps:
+      - Confirm that the selected Labgrid backend supports the exact PDU model and firmware.
+      - Plug the board's approved adapter into one correctly rated PDU outlet.
+      - Replace the generated template placeholders with the PDU address and exact outlet number.
     documentation: [configuration, power-backends]
 
   - id: no-hardware-usb
@@ -200,8 +228,8 @@ recommendations:
     summary: Ask the operator to switch power for now. Add a compatible USB hub or YKUSH later when you need automation.
     when:
       all:
-        - question: power-load
-          equals: usb-board
+        - question: power-source
+          equals: usb
         - question: controller
           equals: none
     why:
@@ -225,6 +253,9 @@ recommendations:
     commands:
       - command: pytest --lg-env environment.yaml --capture=no
         description: Allow ManualPowerDriver prompts to reach the terminal during tests.
+    nextSteps:
+      - Use the board's normal USB power path and switch it manually when Labgrid prompts you.
+      - Choose a tested uhubctl hub or supported YKUSH before enabling automatic switching.
     documentation: [configuration]
 
   - id: no-hardware-external
@@ -235,11 +266,8 @@ recommendations:
       all:
         - question: controller
           equals: none
-      any:
-        - question: power-load
+        - question: power-source
           equals: external-adapter
-        - question: power-load
-          equals: multiple-devices
     why:
       - No controller is available for safe automation.
       - External adapters and multiple loads need correctly rated, independently identified switching channels.
@@ -261,6 +289,87 @@ recommendations:
     commands:
       - command: pytest --lg-env environment.yaml --capture=no
         description: Allow ManualPowerDriver prompts to reach the terminal during tests.
+    nextSteps:
+      - Keep using the board's approved adapter and switch it manually when Labgrid prompts you.
+      - Select switching hardware rated for the real load before enabling automatic control.
+    documentation: [configuration]
+
+  - id: unknown-power-source
+    category: warning
+    title: Identify the board's power input first
+    summary: Do not choose switching hardware until you know which cable or adapter actually powers the board.
+    when:
+      all:
+        - question: power-source
+          equals: unknown
+    why:
+      - A USB data connection does not always supply the board's operating power.
+      - Switching the wrong path may leave the board powered or create an unintended back-power path.
+    requirements:
+      hardware:
+        - The board manual, schematic, or a verified description of its power inputs.
+      software: []
+    components: []
+    architecture: []
+    commands: []
+    nextSteps:
+      - Check the board manual and trace every connected power input, including USB, debug probes, and external adapters.
+      - Return to the questions after you can identify the input that supplies operating power.
+    documentation: [configuration]
+
+  - id: verify-usb-hub
+    category: warning
+    title: Test the USB hub before configuring Labgrid
+    summary: Owning a USB hub is not enough. Confirm that uhubctl can switch each required downstream port independently.
+    when:
+      all:
+        - question: power-source
+          equals: usb
+        - question: controller
+          equals: untested-usb-hub
+    why:
+      - Many hubs report power-switching features but cannot remove power from one port independently.
+      - A configuration generated before this check could claim to cycle power while the board remains powered.
+    requirements:
+      hardware:
+        - The exact hub connected to the Linux computer that will control it.
+      software:
+        - uhubctl and permission to access the hub.
+    components: []
+    architecture: []
+    commands:
+      - command: uhubctl
+        description: List the hub and verify real per-port power switching before returning to the advisor.
+    nextSteps:
+      - Install uhubctl on the computer connected to the hub.
+      - Test the exact downstream port and confirm that the board really loses and regains power.
+      - Return and select the tested-hub option only after that check succeeds.
+    documentation: [uhubctl]
+
+  - id: multiple-output-guidance
+    category: warning
+    title: Configure every power channel separately
+    summary: The generated template shows one channel. Add one distinct Labgrid resource and matching driver instance for every independently switched USB port or PDU outlet.
+    when:
+      all:
+        - question: output-count
+          equals: multiple
+        - question: controller
+          in: [smart-usb-hub, ykush, network-pdu]
+    why:
+      - One Labgrid power resource represents one physical port or outlet.
+      - Reusing one resource for several loads would prevent independent control and make test ownership unclear.
+    requirements:
+      hardware:
+        - One correctly rated, independently switchable channel for each board or load.
+      software: []
+    components: []
+    architecture: []
+    commands: []
+    nextSteps:
+      - Record which board is connected to each physical port or outlet.
+      - Duplicate and uniquely name the resource and driver entry for each channel.
+      - Test every channel separately before running a multi-board job.
     documentation: [configuration]
 
   - id: incompatible-usb-controller
@@ -270,12 +379,9 @@ recommendations:
     when:
       all:
         - question: controller
-          in: [smart-usb-hub, ykush]
-      any:
-        - question: power-load
+          in: [smart-usb-hub, untested-usb-hub, ykush]
+        - question: power-source
           equals: external-adapter
-        - question: power-load
-          equals: multiple-devices
     why:
       - The electrical load and selected control path do not match.
       - Rewiring power without checking voltage, polarity, current, grounding, and isolation can damage equipment or create a safety hazard.
@@ -286,6 +392,9 @@ recommendations:
     components: []
     architecture: []
     commands: []
+    nextSteps:
+      - Keep the external adapter connected exactly as its manufacturer specifies.
+      - Choose a supported network PDU or an engineered switching path rated for that adapter.
     documentation: [configuration, uhubctl]
 
   - id: unknown-pdu
@@ -309,6 +418,9 @@ recommendations:
     components: []
     architecture: []
     commands: []
+    nextSteps:
+      - Record the exact PDU manufacturer, model, firmware, protocol, and outlet numbering.
+      - Compare those details with Labgrid's backend list before returning to the advisor.
     documentation: [power-backends]
 
   - id: usb-board-on-pdu
@@ -317,8 +429,8 @@ recommendations:
     summary: This is whole-outlet control. Use a manufacturer-approved USB power adapter and do not describe the result as per-port USB switching.
     when:
       all:
-        - question: power-load
-          equals: usb-board
+        - question: power-source
+          equals: usb
         - question: controller
           equals: network-pdu
     why:
@@ -331,6 +443,9 @@ recommendations:
     components: []
     architecture: []
     commands: []
+    nextSteps:
+      - Confirm that the board is powered through an approved USB adapter connected to the selected PDU outlet.
+      - Check for other USB or debug connections that could keep the board powered when that outlet is off.
     documentation: [configuration]
 
   - id: local-topology
@@ -416,8 +531,8 @@ configurations:
     kind: environment
     when:
       all:
-        - question: power-load
-          equals: usb-board
+        - question: power-source
+          equals: usb
         - question: controller
           equals: smart-usb-hub
         - question: location
@@ -450,8 +565,8 @@ configurations:
     kind: exporter
     when:
       all:
-        - question: power-load
-          equals: usb-board
+        - question: power-source
+          equals: usb
         - question: controller
           equals: smart-usb-hub
         - question: location
@@ -485,8 +600,8 @@ configurations:
     kind: environment
     when:
       all:
-        - question: power-load
-          equals: usb-board
+        - question: power-source
+          equals: usb
         - question: controller
           equals: smart-usb-hub
         - question: location
@@ -512,8 +627,8 @@ configurations:
     kind: environment
     when:
       all:
-        - question: power-load
-          equals: usb-board
+        - question: power-source
+          equals: usb
         - question: controller
           equals: ykush
         - question: location
@@ -545,8 +660,8 @@ configurations:
     kind: exporter
     when:
       all:
-        - question: power-load
-          equals: usb-board
+        - question: power-source
+          equals: usb
         - question: controller
           equals: ykush
         - question: location
@@ -579,8 +694,8 @@ configurations:
     kind: environment
     when:
       all:
-        - question: power-load
-          equals: usb-board
+        - question: power-source
+          equals: usb
         - question: controller
           equals: ykush
         - question: location

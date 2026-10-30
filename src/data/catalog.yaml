@@ -13,11 +13,11 @@ useCases:
     status: available
   - id: automated-hardware-testing
     title: Automated Hardware Testing
-    description: Run repeatable pytest checks against real hardware.
+    description: Test a board's serial console or Linux shell with pytest.
     status: available
   - id: ci-integration
     title: CI Integration
-    description: Let CI jobs reserve a board, test it, and release it safely.
+    description: Run CI tests on boards already shared through a Labgrid coordinator.
     status: available
   - id: remote-board-access
     title: Remote Board Access

@@ -17,11 +17,13 @@ describe('core user journey', () => {
 
     await user.click(screen.getByRole('button', { name: /open remote power control guide/i }));
 
-    await user.click(screen.getByRole('button', { name: /board with an external dc adapter/i }));
+    await user.click(screen.getByRole('button', { name: /through a separate dc adapter/i }));
+    await user.click(screen.getByRole('button', { name: /^continue/i }));
+    await user.click(screen.getByRole('button', { name: /one board or power channel/i }));
     await user.click(screen.getByRole('button', { name: /^continue/i }));
     await user.click(screen.getByRole('button', { name: /network-controlled pdu/i }));
     await user.click(screen.getByRole('button', { name: /^continue/i }));
-    await user.click(screen.getByRole('button', { name: /another network host/i }));
+    await user.click(screen.getByRole('button', { name: /through another linux host/i }));
     await user.click(screen.getByRole('button', { name: /^continue/i }));
     await user.click(screen.getByRole('button', { name: /^netio/i }));
     await user.click(screen.getByRole('button', { name: /see recommendation/i }));
@@ -43,7 +45,7 @@ describe('core user journey', () => {
     render(<App />);
     expect(screen.getAllByRole('button', { name: /open .* guide/i })).toHaveLength(7);
     await user.click(screen.getByRole('button', { name: /open serial console access guide/i }));
-    expect(screen.getByRole('heading', { name: /how is the serial console exposed/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /how do you connect to the board to see startup messages/i })).toBeInTheDocument();
   });
 
   it('switches theme and remembers the choice', async () => {

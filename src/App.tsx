@@ -19,15 +19,6 @@ function preferredTheme(): Theme {
 function Landing({ entries, onSelect }: { entries: CatalogEntry[]; onSelect: (id: string) => void }) {
   return (
     <main id="main-content" className="landing-page page-shell">
-      <section className="hero">
-        <h1>Labgrid Setup Advisor</h1>
-        <div className="docs-notice" role="note">
-          <strong><Icon name="check" /> Deterministic setup guidance</strong>
-          <p>Answer a few questions. We will explain the parts and generate a configuration you can edit.</p>
-        </div>
-        <p>Choose what you want to do. If you do not know a hardware detail yet, say so—the advisor will tell you what to check instead of guessing.</p>
-      </section>
-
       <UseCaseCatalog entries={entries} onSelect={onSelect} />
 
       <section className="how-it-works">
@@ -85,12 +76,8 @@ export default function App() {
       <header className="site-header">
         <div className="header-inner page-shell">
           <button className="brand" onClick={goHome} aria-label="Labgrid Setup Advisor home">
-            <span>Labgrid</span>
+            <span>Labgrid Setup Advisor</span>
           </button>
-          <div className="header-context">
-            <span className="context-pill">Setup Advisor <Icon name="arrow" /></span>
-            <span>Hardware automation</span>
-          </div>
           <div className="header-meta">
             <button
               className="theme-toggle"

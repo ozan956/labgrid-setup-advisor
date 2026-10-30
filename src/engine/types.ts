@@ -36,6 +36,7 @@ export interface Recommendation {
   category: 'approach' | 'topology' | 'warning';
   title: string;
   summary: string;
+  nextSteps?: string[];
   when: Condition;
   why: string[];
   requirements: {
@@ -85,4 +86,3 @@ export interface ValidationResult {
   valid: boolean;
   errors: string[];
 }
-

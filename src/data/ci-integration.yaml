@@ -1,7 +1,7 @@
 schemaVersion: 1
 id: ci-integration
 title: CI Integration
-description: Acquire shared hardware safely from a CI job, run Labgrid tests, and release it reliably.
+description: Run CI work on hardware already published through a Labgrid coordinator, then release it reliably.
 
 questions:
   - id: allocation
@@ -17,20 +17,23 @@ questions:
 
   - id: workload
     text: What will the job run?
-    help: Choose a full pytest suite or a small set of direct Labgrid commands.
+    help: Choose a full pytest suite or one small serial-console smoke action.
     options:
       - value: pytest
         label: A pytest hardware suite
         description: Run repeatable Python tests that use Labgrid's pytest integration.
       - value: client-command
-        label: A few direct Labgrid commands
-        description: Run a focused power, console, digital-I/O, or strategy action.
+        label: A serial-console smoke command
+        description: Open or check the exported serial console with labgrid-client.
 
 recommendations:
   - id: fixed-ci-place
     category: approach
     title: Reserve the same board for every job
     summary: Give the board a stable name, reserve it when the job starts, and release it even when the job fails.
+    nextSteps:
+      - From the CI runner, use labgrid-client places to confirm that the named board is visible.
+      - Acquire and release that place manually once before adding the commands to the pipeline.
     when:
       all:
         - question: allocation
@@ -68,6 +71,9 @@ recommendations:
     category: approach
     title: Let Labgrid find any compatible free board
     summary: Label equivalent boards by capability and wait until one can be reserved for the job.
+    nextSteps:
+      - Ask the lab operator for the exact coordinator tag that identifies compatible boards.
+      - From the CI runner, reserve, acquire, release, and cancel one tagged reservation manually before automating it.
     when:
       all:
         - question: allocation
@@ -109,6 +115,9 @@ recommendations:
     category: topology
     title: Run pytest after the board is reserved
     summary: Keep the Labgrid test configuration in the repository and start pytest only after the job has exclusive board access.
+    nextSteps:
+      - Add the generated CI environment to the repository and run one focused pytest job after acquisition.
+      - Put release and reservation cancellation in the CI system's unconditional cleanup step.
     when:
       all:
         - question: workload
@@ -132,18 +141,21 @@ recommendations:
 
   - id: command-ci
     category: topology
-    title: Run a small set of direct Labgrid commands
-    summary: Use client commands for small smoke operations, while keeping acquisition and cleanup identical to a full test job.
+    title: Run a serial-console smoke command
+    summary: Use labgrid-client for a small console smoke check, while keeping acquisition and cleanup identical to a full test job.
+    nextSteps:
+      - Add the generated serial-console environment to the repository and test the console command after acquisition.
+      - Put release and reservation cancellation in the CI system's unconditional cleanup step.
     when:
       all:
         - question: workload
           equals: client-command
     why:
-      - Focused client commands are useful for smoke checks and maintenance jobs.
+      - A focused console command is useful for smoke checks before building a full pytest suite.
     requirements:
       hardware: []
       software:
-        - A client environment containing the driver required by the selected command.
+        - A client environment containing RemotePlace and SerialDriver.
     components:
       - kind: infrastructure
         name: labgrid-client

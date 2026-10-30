@@ -5,22 +5,40 @@ description: Choose a local or distributed serial-console path and generate the 
 
 questions:
   - id: serial-hardware
-    text: How is the serial console exposed?
-    help: Choose the interface Labgrid can reach; voltage-level conversion and board wiring must already be correct.
+    text: How do you connect to the board to see startup messages?
+    help: Choose the cable or network address you already use. If you have never opened the console, choose "I am not sure yet."
     options:
       - value: usb-adapter
-        label: A USB-to-serial adapter
-        description: A Linux host sees a tty device backed by a USB adapter.
+        label: A USB cable or USB-to-UART adapter
+        description: Linux shows the connection as a serial device such as /dev/ttyUSB0 or /dev/ttyACM0.
       - value: network-server
-        label: A serial console available over the network
-        description: Someone has given you a host and port for the console.
+        label: A hostname or IP address and TCP port
+        description: Someone gave you an address such as console.example.org:7001.
       - value: unknown
         label: I am not sure yet
-        description: I know the board has a serial console, but not which adapter or connection it uses.
+        description: Help me identify the connection without guessing about its wiring or voltage.
+
+  - id: network-protocol
+    text: Which protocol does the network serial server use?
+    help: Use the value from the serial-server configuration or ask its administrator. Raw TCP and RFC2217 are not interchangeable.
+    visibleWhen:
+      all:
+        - question: serial-hardware
+          equals: network-server
+    options:
+      - value: raw
+        label: Raw TCP
+        description: The server provides a plain TCP byte stream.
+      - value: rfc2217
+        label: RFC2217
+        description: The server supports serial-port control through RFC2217.
+      - value: unknown
+        label: I do not know
+        description: I need to check the server configuration or ask its administrator.
 
   - id: location
-    text: Where will the console be used?
-    help: Shared or remote USB hardware should be published through an exporter and acquired as a place.
+    text: Which Linux computer will directly open the serial connection?
+    help: Choose the computer with the USB cable attached, or the computer that will connect to the network serial server. It may be different from the computer where you are reading this page.
     visibleWhen:
       any:
         - question: serial-hardware
@@ -29,11 +47,11 @@ questions:
           equals: network-server
     options:
       - value: local
-        label: On this computer
-        description: The Labgrid client can access the adapter or serial server directly.
+        label: The computer where I will run Labgrid
+        description: The USB cable is attached here, or this computer can reach the network serial server directly.
       - value: remote
-        label: On another computer in the lab
-        description: Labgrid will make the connected console available safely over the network.
+        label: A different Linux computer beside the board
+        description: That computer will open the serial connection and share it through Labgrid.
 
 recommendations:
   - id: identify-serial-interface
@@ -47,6 +65,11 @@ recommendations:
     why:
       - Labgrid needs to know how the console is physically reached before it can select a safe resource.
       - UART voltage and pinout must match the board; software cannot determine that safely.
+    nextSteps:
+      - Note the exact board model and revision, then open its official serial or UART documentation.
+      - Before attaching bare UART pins, confirm the connector pinout, I/O voltage, and a common ground.
+      - If a USB connection is attached to Linux, run labgrid-suggest and look for a USBSerialPort suggestion.
+      - Return with the connection type and the console baud rate from the board documentation.
     requirements:
       hardware:
         - The board manual or wiring information for its serial console.
@@ -59,6 +82,56 @@ recommendations:
         description: List USB devices Labgrid may be able to describe.
     documentation: [suggest]
 
+  - id: check-network-protocol
+    category: warning
+    title: Confirm the network serial protocol before configuring Labgrid
+    summary: 'Ask the serial-server administrator whether the endpoint uses raw TCP or RFC2217. Do not guess: the two protocols are not interchangeable.'
+    when:
+      all:
+        - question: serial-hardware
+          equals: network-server
+        - question: network-protocol
+          equals: unknown
+    why:
+      - Labgrid must use the same protocol as the serial server to open the console correctly.
+      - A hostname and port alone do not identify whether the endpoint is raw TCP or RFC2217.
+    nextSteps:
+      - Check the serial-server configuration or ask its administrator for the protocol name.
+      - Also collect the endpoint hostname, TCP port, and board console baud rate.
+      - Return and select Raw TCP or RFC2217 before copying a configuration template.
+    requirements:
+      hardware: []
+      software:
+        - Access to the serial-server configuration or its administrator.
+    components: []
+    architecture: []
+    commands: []
+    documentation: [configuration]
+
+  - id: check-usb-uart-safety
+    category: warning
+    title: Check the electrical connection before using bare UART pins
+    summary: An adapter that fits can still use the wrong electrical standard or voltage. TTL UART and RS-232 are not interchangeable.
+    when:
+      all:
+        - question: serial-hardware
+          equals: usb-adapter
+    why:
+      - A voltage or pinout mismatch can damage the adapter or board.
+      - A board with a built-in USB serial connector does not need separate bare-pin UART wiring.
+    nextSteps:
+      - If you use the board's built-in USB serial connector, follow the board manual for that connector.
+      - If you use bare UART pins, confirm the board I/O voltage, adapter voltage, TX/RX pinout, and common ground before connecting it.
+      - Do not connect an RS-232 adapter to TTL UART pins unless the board documentation explicitly requires RS-232 levels.
+    requirements:
+      hardware:
+        - The exact board and adapter documentation when using bare UART pins.
+      software: []
+    components: []
+    architecture: []
+    commands: []
+    documentation: [configuration]
+
   - id: usb-serial
     category: approach
     title: Use the USB-to-serial adapter
@@ -70,6 +143,11 @@ recommendations:
     why:
       - USBSerialPort follows the adapter through udev and supplies SerialDriver with its current device node.
       - The exporter translates it to NetworkSerialPort for remote clients.
+    nextSteps:
+      - Find the console baud rate in the board documentation and complete the electrical check for any bare UART wiring.
+      - Connect the USB cable or adapter to the Linux computer that will handle the console.
+      - Run labgrid-suggest on that computer and note its stable ID_SERIAL_SHORT or ID_PATH.
+      - Replace every placeholder in the generated template before opening the console.
     requirements:
       hardware:
         - A correctly wired UART adapter with voltage levels compatible with the target.
@@ -103,9 +181,15 @@ recommendations:
       all:
         - question: serial-hardware
           equals: network-server
+        - question: network-protocol
+          in: [raw, rfc2217]
     why:
       - NetworkSerialPort is the upstream resource for raw TCP and RFC2217 serial endpoints.
       - SerialDriver applies the configured line speed and opens the network connection.
+    nextSteps:
+      - Collect the server hostname or IP address, TCP port, protocol, and board console baud rate.
+      - Verify that the selected Linux computer can reach the endpoint.
+      - Replace every placeholder in the generated template before opening the console.
     requirements:
       hardware:
         - A serial server connected with the correct UART voltage, pinout, and flow-control settings.
@@ -138,6 +222,10 @@ recommendations:
           equals: local
     why:
       - Local resources can be declared directly in the target environment.
+    nextSteps:
+      - Save the generated environment template as environment.yaml.
+      - Replace every marked placeholder with a value verified for your hardware.
+      - Run labgrid-client -c environment.yaml console to open the configured console.
     requirements:
       hardware: []
       software:
@@ -162,6 +250,10 @@ recommendations:
           equals: remote
     why:
       - The coordinator provides discovery and exclusive acquisition while the exporter exposes the hardware-side console.
+    nextSteps:
+      - Follow the distributed infrastructure tutorial to start a coordinator and an exporter on the hardware-side Linux computer.
+      - Publish the serial resource with exporter.yaml and map it to a coordinator place.
+      - Acquire the place before opening the console, then release it when finished.
     requirements:
       hardware:
         - A Linux exporter host with access to the serial interface.
@@ -231,6 +323,8 @@ configurations:
       all:
         - question: serial-hardware
           equals: network-server
+        - question: network-protocol
+          in: [raw, rfc2217]
         - question: location
           equals: local
     template: |
@@ -241,7 +335,7 @@ configurations:
               host: '{{SERIAL_HOST}}'
               port: {{SERIAL_PORT}}
               speed: {{BAUD_RATE}}
-              protocol: raw
+              protocol: '{{answer:network-protocol}}'
           drivers:
             SerialDriver: {}
     placeholders:
@@ -302,6 +396,8 @@ configurations:
       all:
         - question: serial-hardware
           equals: network-server
+        - question: network-protocol
+          in: [raw, rfc2217]
         - question: location
           equals: remote
     template: |
@@ -310,7 +406,7 @@ configurations:
           host: '{{SERIAL_HOST}}'
           port: {{SERIAL_PORT}}
           speed: {{BAUD_RATE}}
-          protocol: raw
+          protocol: '{{answer:network-protocol}}'
     placeholders:
       - token: EXPORT_GROUP
         label: Exporter group
@@ -341,6 +437,11 @@ configurations:
       all:
         - question: location
           equals: remote
+      any:
+        - question: serial-hardware
+          equals: usb-adapter
+        - question: network-protocol
+          in: [raw, rfc2217]
     template: |
       targets:
         main:

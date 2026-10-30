@@ -11,7 +11,7 @@ export function UseCaseCatalog({ entries, onSelect }: Props) {
 
   return (
     <section id="use-cases" className="catalog-page">
-      <h2>Choose a setup</h2>
+      <h1>Choose a setup</h1>
       <p className="page-intro">Pick the outcome closest to what you need. You do not need to know Labgrid class names.</p>
       <div className="use-case-grid">
         {available.map((entry) => (

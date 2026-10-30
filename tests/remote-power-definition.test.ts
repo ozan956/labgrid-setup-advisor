@@ -11,12 +11,13 @@ const engine = new DecisionEngine(definition);
 describe('remote power use case', () => {
   it('loads as a valid decision definition', () => {
     expect(definition.id).toBe('remote-power-control');
-    expect(definition.questions).toHaveLength(4);
+    expect(definition.questions).toHaveLength(5);
   });
 
   it('recommends a distributed network setup for the example scenario', () => {
     const answers = {
-      'power-load': 'external-adapter',
+      'power-source': 'external-adapter',
+      'output-count': 'one',
       controller: 'network-pdu',
       location: 'remote-host',
       'pdu-model': 'netio',
@@ -33,7 +34,8 @@ describe('remote power use case', () => {
 
   it('does not recommend USB switching for an external adapter', () => {
     const answers = {
-      'power-load': 'external-adapter',
+      'power-source': 'external-adapter',
+      'output-count': 'one',
       controller: 'smart-usb-hub',
       location: 'local',
     };
@@ -46,13 +48,15 @@ describe('remote power use case', () => {
 
   it('requires backend verification for an unknown PDU', () => {
     const answers = {
-      'power-load': 'multiple-devices',
+      'power-source': 'external-adapter',
+      'output-count': 'multiple',
       controller: 'network-pdu',
       location: 'remote-lab',
       'pdu-model': 'unknown',
     };
     expect(engine.recommendations(answers).map(({ recommendation }) => recommendation.id)).toEqual([
       'network-pdu-power',
+      'multiple-output-guidance',
       'unknown-pdu',
       'distributed-topology',
     ]);
@@ -61,13 +65,13 @@ describe('remote power use case', () => {
 
   it('generates YAML parseable templates for each supported path', () => {
     const paths: Answers[] = [
-      { 'power-load': 'usb-board', controller: 'smart-usb-hub', location: 'local' },
-      { 'power-load': 'usb-board', controller: 'smart-usb-hub', location: 'remote-host' },
-      { 'power-load': 'usb-board', controller: 'ykush', location: 'local' },
-      { 'power-load': 'usb-board', controller: 'ykush', location: 'remote-lab' },
-      { 'power-load': 'external-adapter', controller: 'network-pdu', location: 'local', 'pdu-model': 'gude' },
-      { 'power-load': 'external-adapter', controller: 'network-pdu', location: 'remote-lab', 'pdu-model': 'eaton' },
-      { 'power-load': 'usb-board', controller: 'none', location: 'local' },
+      { 'power-source': 'usb', 'output-count': 'one', controller: 'smart-usb-hub', location: 'local' },
+      { 'power-source': 'usb', 'output-count': 'one', controller: 'smart-usb-hub', location: 'remote-host' },
+      { 'power-source': 'usb', 'output-count': 'one', controller: 'ykush', location: 'local' },
+      { 'power-source': 'usb', 'output-count': 'one', controller: 'ykush', location: 'remote-lab' },
+      { 'power-source': 'external-adapter', 'output-count': 'one', controller: 'network-pdu', location: 'local', 'pdu-model': 'gude' },
+      { 'power-source': 'external-adapter', 'output-count': 'one', controller: 'network-pdu', location: 'remote-lab', 'pdu-model': 'eaton' },
+      { 'power-source': 'usb', 'output-count': 'one', controller: 'none', location: 'local' },
     ];
     for (const answers of paths) {
       for (const generated of engine.configurations(answers)) expect(() => parse(generated.content)).not.toThrow();

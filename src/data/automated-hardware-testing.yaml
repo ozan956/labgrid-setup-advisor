@@ -1,7 +1,7 @@
 schemaVersion: 1
 id: automated-hardware-testing
 title: Automated Hardware Testing
-description: Build a pytest-ready Labgrid target for console-level or Linux shell tests.
+description: Build repeatable pytest checks for a board's serial console or Linux shell.
 
 questions:
   - id: test-level
@@ -9,11 +9,11 @@ questions:
     help: Choose whether the test only watches the console or logs in and runs commands.
     options:
       - value: console
-        label: Watch boot output or send text
+        label: Only read or send console text
         description: The test reads and writes the serial console without logging into Linux.
       - value: shell
-        label: Commands in a Linux shell
-        description: Tests log in through the console and run shell commands.
+        label: Log in and run Linux commands
+        description: This also uses the serial console, then logs in after Linux starts.
 
   - id: topology
     text: Where does the test run relative to the board?
@@ -31,6 +31,8 @@ recommendations:
     category: approach
     title: Test the serial console directly
     summary: Use pytest to send text, watch output, and check timeouts without assuming the board has booted Linux.
+    nextSteps:
+      - Confirm the serial console works manually and choose one known message or exchange for the first test.
     when:
       all:
         - question: test-level
@@ -66,6 +68,8 @@ recommendations:
     category: approach
     title: Log in and run Linux shell commands
     summary: Tell Labgrid how to recognize the login and shell prompts, then run command-level checks through pytest.
+    nextSteps:
+      - Confirm the board reaches a stable login over serial, then record its username, login prompt, and shell prompt.
     when:
       all:
         - question: test-level
@@ -101,6 +105,9 @@ recommendations:
     category: topology
     title: Run the tests on the connected computer
     summary: Keep the first test setup local when one host owns the board and no cross-user locking is required.
+    nextSteps:
+      - Identify the serial device and baud rate on the computer connected to the board.
+      - Fill in the local environment template and run one focused test with pytest --lg-env environment.yaml.
     when:
       all:
         - question: topology
@@ -123,6 +130,9 @@ recommendations:
     category: topology
     title: Reserve the board before remote or CI tests
     summary: Share the board over the network, reserve it before pytest starts, and always release it afterward.
+    nextSteps:
+      - Configure the exporter, coordinator place, and remote console; verify that a developer can acquire the place once.
+      - Fill in the exporter and remote environment templates, then acquire, test, and release the place from the test runner.
     when:
       all:
         - question: topology

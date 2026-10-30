@@ -75,6 +75,7 @@ safety warning.
 Each recommendation includes:
 
 - a summary and explicit reasons;
+- optional ordered `nextSteps` shown prominently to beginners;
 - hardware and software requirements;
 - Resource, Driver, Strategy, or infrastructure components;
 - an ordered architecture description;
@@ -126,4 +127,3 @@ The loader rejects:
 - missing or unused placeholder declarations;
 - answer substitutions referring to unknown questions;
 - definitions which expand beyond the bounded path-validation limit.
-
