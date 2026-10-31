@@ -27,10 +27,12 @@ export function DetectPanel({ catalog, existing, onAdd }: Props) {
   const [text, setText] = useState('');
   const [result, setResult] = useState<DetectionResult>();
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [status, setStatus] = useState('');
 
   function detect(): void {
     const detection = parseHardwareText(text, catalog, existing);
     setResult(detection);
+    setStatus('');
     setSelected(new Set(detection.candidates.map((candidate, index) => (candidate.confidence === 'low' ? -1 : index)).filter((index) => index >= 0)));
   }
 
@@ -45,7 +47,9 @@ export function DetectPanel({ catalog, existing, onAdd }: Props) {
 
   function add(): void {
     if (!result) return;
-    onAdd(result.candidates.filter((_, index) => selected.has(index)).map(({ device }) => device));
+    const devices = result.candidates.filter((_, index) => selected.has(index)).map(({ device }) => device);
+    onAdd(devices);
+    setStatus(`Added ${devices.length} ${devices.length === 1 ? 'device' : 'devices'} to your bench.`);
     setText('');
     setResult(undefined);
     setSelected(new Set());
@@ -61,7 +65,7 @@ export function DetectPanel({ catalog, existing, onAdd }: Props) {
           <li key={command}>
             <code>{command}</code>
             <span>{note}</span>
-            <CopyButton text={command} compact />
+            <CopyButton text={command} compact ariaLabel={`Copy command ${command}`} />
           </li>
         ))}
       </ul>
@@ -85,44 +89,51 @@ export function DetectPanel({ catalog, existing, onAdd }: Props) {
         </div>
       )}
 
-      {result && result.format !== 'unknown' && (
-        <div className="detect-results" aria-live="polite">
-          <p className="detect-summary">
-            Recognized {FORMAT_LABELS[result.format]}: {result.candidates.length} {result.candidates.length === 1 ? 'device' : 'devices'} Labgrid can use.
-          </p>
-          {result.candidates.length > 0 && (
-            <ul className="candidate-list">
-              {result.candidates.map((candidate, index) => (
-                <li key={`${candidate.device.kind}-${index}`} className={`candidate confidence-${candidate.confidence}`}>
-                  <label>
-                    <input type="checkbox" checked={selected.has(index)} onChange={() => toggle(index)} />
-                    <span className="candidate-body">
-                      <span className="candidate-title">
-                        <KindBadge device={candidate.device} />
-                        <strong>{candidate.device.label}</strong>
-                        {candidate.catalogEntry && <span className="candidate-product">{candidate.catalogEntry.vendor} {candidate.catalogEntry.product}</span>}
-                        <span className={`confidence confidence-${candidate.confidence}`}>{candidate.confidence} confidence</span>
+      {/* The live region stays mounted so screen readers announce results that appear inside it. */}
+      <div className="detect-results-region" aria-live="polite">
+        {status && <p className="detect-summary" role="status">{status}</p>}
+        {result && result.format !== 'unknown' && (
+          <div className="detect-results">
+            <p className="detect-summary">
+              Recognized {FORMAT_LABELS[result.format]}: {result.candidates.length} {result.candidates.length === 1 ? 'device' : 'devices'} Labgrid can use.
+            </p>
+            {result.candidates.length > 0 && (
+              <ul className="candidate-list" aria-label="Detected devices">
+                {result.candidates.map((candidate, index) => (
+                  <li key={`${candidate.device.kind}-${index}`} className={`candidate confidence-${candidate.confidence}`}>
+                    <label>
+                      <input type="checkbox" checked={selected.has(index)} onChange={() => toggle(index)} />
+                      <span className="candidate-body">
+                        <span className="candidate-title">
+                          <KindBadge device={candidate.device} />
+                          <strong className="candidate-label">{candidate.device.label}</strong>
+                          {candidate.catalogEntry && <span className="candidate-product">{candidate.catalogEntry.vendor} {candidate.catalogEntry.product}</span>}
+                          <span className={`confidence confidence-${candidate.confidence}`}>{candidate.confidence} confidence</span>
+                        </span>
+                        <small>{candidate.explanation}</small>
                       </span>
-                      <small>{candidate.explanation}</small>
-                    </span>
-                  </label>
-                </li>
-              ))}
-            </ul>
-          )}
-          {result.skipped.length > 0 && (
-            <details className="skipped-list">
-              <summary>{result.skipped.length} skipped {result.skipped.length === 1 ? 'entry' : 'entries'}</summary>
-              <ul>{result.skipped.map((item) => <li key={item.summary}><strong>{item.summary}</strong> {item.reason}</li>)}</ul>
-            </details>
-          )}
-          <div className="detect-actions">
-            <button className="button primary" type="button" disabled={selected.size === 0} onClick={add}>
-              Add selected devices
-            </button>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {result.skipped.length > 0 && (
+              <details className="skipped-list">
+                <summary>{result.skipped.length} skipped {result.skipped.length === 1 ? 'entry' : 'entries'}</summary>
+                <ul>{result.skipped.map((item) => <li key={item.summary}><strong>{item.summary}</strong> {item.reason}</li>)}</ul>
+              </details>
+            )}
+            <div className="detect-actions">
+              <button className="button primary" type="button" disabled={selected.size === 0} onClick={add}>
+                Add selected devices
+              </button>
+              {selected.size === 0 && result.candidates.length > 0 && (
+                <span className="field-hint">Tick at least one device to add it.</span>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

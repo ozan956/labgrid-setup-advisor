@@ -6,7 +6,7 @@ import { sampleBenches, type SampleBench } from './bench/samples';
 import { clearProfile, decodeShareHash, loadProfile, saveProfile } from './bench/storage';
 import type { BenchProfile, Prefill } from './bench/types';
 import { BenchEditor } from './components/bench/BenchEditor';
-import { BenchPlan } from './components/bench/BenchPlan';
+import { BenchPlan, CHECKLIST_KEY_PREFIX } from './components/bench/BenchPlan';
 import { Icon } from './components/Icons';
 import { Landing } from './components/Landing';
 import { Results } from './components/Results';
@@ -17,6 +17,9 @@ import type { Answers, UseCaseDefinition } from './engine/types';
 
 type Screen = 'landing' | 'bench' | 'plan' | 'wizard' | 'results';
 type Theme = 'light' | 'dark';
+type Origin = 'landing' | 'plan';
+
+const SHARE_ERROR = 'This share link could not be read. Ask for a new link or describe the bench yourself.';
 
 function preferredTheme(): Theme {
   const saved = window.localStorage.getItem('labgrid-advisor-theme');
@@ -24,28 +27,44 @@ function preferredTheme(): Theme {
   return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-function initialProfile(): { profile?: BenchProfile; shared: boolean } {
-  const shared = decodeShareHash(window.location.hash);
-  if (shared) {
-    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
-    return { profile: shared, shared: true };
+interface InitialState {
+  profile?: BenchProfile;
+  /** The profile came from a share link and is not saved yet. */
+  shared: boolean;
+  /** A share hash was present but could not be decoded. */
+  shareError: boolean;
+}
+
+/** Pure: reads the URL and storage without side effects so StrictMode double calls are harmless. */
+function initialState(): InitialState {
+  const hash = window.location.hash;
+  const hasShareHash = /(^#|[#&])bench=/.test(hash);
+  const shared = hasShareHash ? decodeShareHash(hash) : undefined;
+  if (shared) return { profile: shared, shared: true, shareError: false };
+  return { profile: loadProfile(), shared: false, shareError: hasShareHash };
+}
+
+function clearChecklists(): void {
+  const keys: string[] = [];
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+    if (key?.startsWith(CHECKLIST_KEY_PREFIX)) keys.push(key);
   }
-  return { profile: loadProfile(), shared: false };
+  for (const key of keys) window.localStorage.removeItem(key);
 }
 
 export default function App() {
-  const [theme, setTheme] = useState<Theme>(() => {
-    const initial = preferredTheme();
-    document.documentElement.dataset.theme = initial;
-    return initial;
-  });
-  const [initial] = useState(initialProfile);
+  const [theme, setTheme] = useState<Theme>(preferredTheme);
+  const [initial] = useState(initialState);
   const [screen, setScreen] = useState<Screen>(initial.shared ? 'plan' : 'landing');
   const [profile, setProfile] = useState<BenchProfile | undefined>(initial.profile);
+  const [shared, setShared] = useState(initial.shared);
+  const [notice, setNotice] = useState<string | undefined>(initial.shareError ? SHARE_ERROR : undefined);
   const [definition, setDefinition] = useState<UseCaseDefinition>();
   const [answers, setAnswers] = useState<Answers>({});
   const [values, setValues] = useState<PlaceholderValues>({});
   const [prefill, setPrefill] = useState<Prefill>();
+  const [origin, setOrigin] = useState<Origin>('landing');
   const [questionIndex, setQuestionIndex] = useState(0);
 
   useEffect(() => {
@@ -53,8 +72,11 @@ export default function App() {
     window.localStorage.setItem('labgrid-advisor-theme', theme);
   }, [theme]);
 
+  // Drop the share hash once it has been read so a reload does not re-import it.
   useEffect(() => {
-    if (initial.shared && initial.profile) saveProfile(initial.profile);
+    if ((initial.shared || initial.shareError) && /(^#|[#&])bench=/.test(window.location.hash)) {
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    }
   }, [initial]);
 
   const prefills = useMemo(() => {
@@ -64,32 +86,47 @@ export default function App() {
     return map;
   }, [profile]);
 
+  const hasBench = profile !== undefined && profile.devices.length > 0;
+
   function updateProfile(next: BenchProfile): void {
     setProfile(next);
+    // Editing a shared bench adopts it.
+    setShared(false);
     saveProfile(next);
+  }
+
+  function adoptShared(): void {
+    if (profile) saveProfile(profile);
+    setShared(false);
+  }
+
+  function discardShared(): void {
+    const saved = loadProfile();
+    setShared(false);
+    setProfile(saved);
+    setScreen(saved && saved.devices.length > 0 ? 'plan' : 'landing');
   }
 
   function goHome(): void {
     setScreen('landing');
-    setDefinition(undefined);
-    setAnswers({});
-    setValues({});
-    setPrefill(undefined);
-    setQuestionIndex(0);
+    setNotice(undefined);
   }
 
   function openBench(): void {
     if (!profile) setProfile(emptyProfile());
+    setNotice(undefined);
     setScreen('bench');
   }
 
   function openPlan(): void {
-    if (profile && profile.devices.length > 0) setScreen('plan');
+    if (hasBench) setScreen('plan');
     else openBench();
   }
 
   function resetBench(): void {
     clearProfile();
+    clearChecklists();
+    setShared(false);
     setProfile(emptyProfile());
   }
 
@@ -98,20 +135,26 @@ export default function App() {
     setScreen('plan');
   }
 
-  function openUseCase(id: string, jumpWhenComplete: boolean): void {
+  function openUseCase(id: string, from: Origin): void {
     const selected = definitions.get(id);
     if (!selected) return;
     const suggestion = prefills.get(id);
-    const prefilled = suggestion ? applyPrefill(selected, suggestion.answers) : {};
     const engine = new DecisionEngine(selected);
+    const sameGuide = definition?.id === id;
+    // Re-opening the guide the user was already working on keeps their answers and typed values.
+    const prefilled = sameGuide && Object.keys(answers).length > 0
+      ? answers
+      : suggestion ? applyPrefill(selected, suggestion.answers) : {};
+    const nextValues = sameGuide ? { ...(suggestion?.values ?? {}), ...values } : { ...(suggestion?.values ?? {}) };
     setDefinition(selected);
     setPrefill(suggestion);
     setAnswers(prefilled);
-    setValues(suggestion ? { ...suggestion.values } : {});
+    setValues(nextValues);
+    setOrigin(from);
     const visible = engine.visibleQuestions(prefilled);
     const firstOpen = visible.findIndex((question) => prefilled[question.id] === undefined);
     setQuestionIndex(firstOpen === -1 ? 0 : firstOpen);
-    if (jumpWhenComplete && engine.answerStatus(prefilled).complete) {
+    if (from === 'plan' && engine.answerStatus(prefilled).complete) {
       setScreen('results');
     } else {
       setScreen('wizard');
@@ -121,6 +164,10 @@ export default function App() {
   function answer(questionId: string, value: string): void {
     if (!definition) return;
     setAnswers((current) => new DecisionEngine(definition).setAnswer(current, questionId, value));
+  }
+
+  function exitWizard(): void {
+    setScreen(origin === 'plan' && hasBench ? 'plan' : 'landing');
   }
 
   return (
@@ -155,7 +202,8 @@ export default function App() {
           catalog={hardwareCatalog}
           prefills={prefills}
           samples={sampleBenches}
-          onSelect={(id) => openUseCase(id, false)}
+          notice={notice}
+          onSelect={(id) => openUseCase(id, 'landing')}
           onDescribe={openBench}
           onViewPlan={openPlan}
           onEditBench={openBench}
@@ -178,8 +226,11 @@ export default function App() {
           catalog={hardwareCatalog}
           entries={catalog.filter((entry) => entry.status === 'available')}
           prefills={prefills}
+          shared={shared}
           onEdit={openBench}
-          onOpenGuide={(id) => openUseCase(id, true)}
+          onOpenGuide={(id) => openUseCase(id, 'plan')}
+          onAdoptShared={adoptShared}
+          onDiscardShared={discardShared}
         />
       )}
       {screen === 'wizard' && definition && (
@@ -188,10 +239,11 @@ export default function App() {
           answers={answers}
           questionIndex={questionIndex}
           prefill={prefill}
+          exitLabel={origin === 'plan' && hasBench ? '← Your bench plan' : '← All setups'}
           onAnswer={answer}
           onIndexChange={setQuestionIndex}
           onComplete={() => setScreen('results')}
-          onExit={() => setScreen(profile && profile.devices.length > 0 && prefill ? 'plan' : 'landing')}
+          onExit={exitWizard}
         />
       )}
       {screen === 'results' && definition && (

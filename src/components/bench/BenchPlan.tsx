@@ -16,8 +16,12 @@ interface Props {
   catalog: HardwareCatalog;
   entries: CatalogEntry[];
   prefills: Map<string, Prefill>;
+  /** True while the profile came from a share link and has not been saved as the user's own bench. */
+  shared?: boolean;
   onEdit: () => void;
   onOpenGuide: (useCaseId: string) => void;
+  onAdoptShared?: () => void;
+  onDiscardShared?: () => void;
 }
 
 const SEVERITY_LABELS: Record<Insight['severity'], string> = {
@@ -27,8 +31,10 @@ const SEVERITY_LABELS: Record<Insight['severity'], string> = {
   success: 'Looks good',
 };
 
+export const CHECKLIST_KEY_PREFIX = 'labgrid-advisor-checklist:';
+
 function checklistKey(place: string): string {
-  return `labgrid-advisor-checklist:${place || 'unnamed'}`;
+  return `${CHECKLIST_KEY_PREFIX}${place || 'unnamed'}`;
 }
 
 function loadDone(place: string): Set<string> {
@@ -41,9 +47,10 @@ function loadDone(place: string): Set<string> {
   }
 }
 
-export function BenchPlan({ profile, catalog, entries, prefills, onEdit, onOpenGuide }: Props) {
+export function BenchPlan({ profile, catalog, entries, prefills, shared = false, onEdit, onOpenGuide, onAdoptShared, onDiscardShared }: Props) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [shareState, setShareState] = useState('Copy share link');
+  const [shareFallback, setShareFallback] = useState<string>();
   const files = useMemo(() => generateBenchFiles(profile, catalog), [profile, catalog]);
   const insights = useMemo(() => analyzeProfile(profile, catalog), [profile, catalog]);
   const steps = useMemo(() => buildChecklist(profile, catalog, files), [profile, catalog, files]);
@@ -58,24 +65,28 @@ export function BenchPlan({ profile, catalog, entries, prefills, onEdit, onOpenG
   }, [profile.names.place]);
 
   function toggleStep(id: string): void {
-    setDone((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      window.localStorage.setItem(checklistKey(profile.names.place), JSON.stringify([...next]));
-      return next;
-    });
+    const next = new Set(done);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    window.localStorage.setItem(checklistKey(profile.names.place), JSON.stringify([...next]));
+    setDone(next);
+  }
+
+  function shareLink(): string {
+    return `${window.location.origin}${window.location.pathname}${encodeShareHash(profile)}`;
   }
 
   async function copyShareLink(): Promise<void> {
-    const link = `${window.location.origin}${window.location.pathname}${encodeShareHash(profile)}`;
+    const link = shareLink();
     try {
       await navigator.clipboard.writeText(link);
+      setShareFallback(undefined);
       setShareState('Link copied');
-      window.setTimeout(() => setShareState('Copy share link'), 1600);
     } catch {
-      setShareState('Could not copy');
+      setShareFallback(link);
+      setShareState('Copy failed; select the link below');
     }
+    window.setTimeout(() => setShareState('Copy share link'), 2400);
   }
 
   function downloadBundle(): void {
@@ -92,6 +103,19 @@ export function BenchPlan({ profile, catalog, entries, prefills, onEdit, onOpenG
 
   return (
     <main id="main-content" className="plan-page page-shell">
+      {shared && (
+        <section className="shared-strip" aria-label="Shared bench">
+          <div>
+            <strong>You are viewing a shared bench.</strong>
+            <p>It is not saved yet. Save it to make it your bench, or discard it to keep what you had.</p>
+          </div>
+          <div className="bench-strip-actions">
+            <button className="button primary" onClick={onAdoptShared}>Save as my bench</button>
+            <button className="button secondary" onClick={onDiscardShared}>Discard</button>
+          </div>
+        </section>
+      )}
+
       <section className="results-hero">
         <div>
           <div className="section-kicker">Your bench plan</div>
@@ -100,10 +124,17 @@ export function BenchPlan({ profile, catalog, entries, prefills, onEdit, onOpenG
           <p>Files below already contain your values. Follow the checklist in order; each step says on which machine it runs.</p>
         </div>
         <div className="plan-actions">
-          <button className="button primary" onClick={downloadBundle}><Icon name="arrow" /> Download bundle (.zip)</button>
+          <button className="button primary" onClick={downloadBundle}><Icon name="download" /> Download bundle (.zip)</button>
           <button className="button secondary" onClick={onEdit}>Edit bench</button>
-          <button className="text-button" onClick={copyShareLink} aria-live="polite">{shareState}</button>
+          <button className="text-button" onClick={copyShareLink}>{shareState}</button>
           <button className="text-button" onClick={() => downloadText('bench-profile.json', JSON.stringify(profile, null, 2), 'application/json')}>Export JSON</button>
+          <span className="visually-hidden" role="status" aria-live="polite">{shareState === 'Copy share link' ? '' : shareState}</span>
+          {shareFallback && (
+            <div className="share-fallback">
+              <label htmlFor="share-link">Share link</label>
+              <input id="share-link" readOnly value={shareFallback} onFocus={(event) => event.target.select()} />
+            </div>
+          )}
         </div>
       </section>
 
@@ -118,31 +149,35 @@ export function BenchPlan({ profile, catalog, entries, prefills, onEdit, onOpenG
         <div className="result-section-heading">
           <div><h2 id="insights-heading">What to know about your hardware</h2><p>Advice derived from the devices, board and topology you described.</p></div>
         </div>
-        <div className="insight-groups">
-          {severities.map((severity) => {
-            const group = insights.filter((insight) => insight.severity === severity);
-            if (group.length === 0) return null;
-            return (
-              <div className={`insight-group severity-${severity}`} key={severity}>
-                <h3>{SEVERITY_LABELS[severity]}</h3>
-                <ul>
-                  {group.map((insight) => (
-                    <li className={`insight severity-${severity}`} key={insight.id}>
-                      <strong>{insight.title}</strong>
-                      <p>{insight.detail}</p>
-                      {insight.command && <CommandLine command={insight.command} />}
-                      {insight.docs && insight.docs.length > 0 && (
-                        <p className="insight-docs">
-                          {insight.docs.map((doc) => <a key={doc.url} href={doc.url} target="_blank" rel="noreferrer">{doc.title} ↗</a>)}
-                        </p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
-        </div>
+        {insights.length === 0 ? (
+          <p className="section-copy">Nothing to flag for this bench.</p>
+        ) : (
+          <div className="insight-groups">
+            {severities.map((severity) => {
+              const group = insights.filter((insight) => insight.severity === severity);
+              if (group.length === 0) return null;
+              return (
+                <div className={`insight-group severity-${severity}`} key={severity}>
+                  <h3>{SEVERITY_LABELS[severity]}</h3>
+                  <ul>
+                    {group.map((insight) => (
+                      <li className={`insight severity-${severity}`} key={insight.id}>
+                        <strong>{insight.title}</strong>
+                        <p>{insight.detail}</p>
+                        {insight.command && <CommandLine command={insight.command} />}
+                        {insight.docs && insight.docs.length > 0 && (
+                          <p className="insight-docs">
+                            {insight.docs.map((doc) => <a key={doc.url} href={doc.url} target="_blank" rel="noreferrer">{doc.title} ↗</a>)}
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       <section className="result-section" aria-labelledby="files-heading">
@@ -157,9 +192,9 @@ export function BenchPlan({ profile, catalog, entries, prefills, onEdit, onOpenG
 
       <section className="result-section" aria-labelledby="checklist-heading">
         <div className="result-section-heading">
-          <div><h2 id="checklist-heading">Step by step</h2><p className="checklist-progress">{doneCount} of {steps.length} done</p></div>
+          <div><h2 id="checklist-heading">Step by step</h2><p className="checklist-progress" aria-live="polite">{doneCount} of {steps.length} done</p></div>
         </div>
-        <ol className="checklist">
+        <ol className="checklist" aria-label="Setup steps">
           {steps.map((step) => (
             <li className={`checklist-step ${done.has(step.id) ? 'is-done' : ''}`} key={step.id}>
               <label className="checklist-title">
@@ -207,7 +242,7 @@ export function BenchPlan({ profile, catalog, entries, prefills, onEdit, onOpenG
                 <article className="use-case-card" key={entry.id}>
                   <h3>{entry.title}</h3>
                   <p>{entry.description}</p>
-                  <button className="card-action" onClick={() => onOpenGuide(entry.id)} aria-label={`Open ${entry.title} with my answers`}>
+                  <button className="card-action" onClick={() => onOpenGuide(entry.id)} aria-label={`Open ${entry.title} guide`}>
                     Open guide <Icon name="arrow" />
                   </button>
                 </article>

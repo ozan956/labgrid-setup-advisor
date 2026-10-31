@@ -29,7 +29,7 @@ export function GeneratedFileCard({ file, collapsed = false }: { file: Generated
   );
 
   return (
-    <article className="config-card generated-file">
+    <article className="config-card generated-file" aria-label={`${file.title} (${file.filename})`}>
       <header>
         <div>
           <span className={`file-kind ${file.kind}`}>{KIND_LABELS[file.kind]}</span>
@@ -38,9 +38,15 @@ export function GeneratedFileCard({ file, collapsed = false }: { file: Generated
           <TargetBadge target={file.target} />
         </div>
         <div className="file-actions">
-          <CopyButton text={file.content} label="Copy" />
-          <button className="copy-button" type="button" onClick={() => downloadText(file.filename, file.content)}>
-            <Icon name="arrow" /> Download
+          <CopyButton text={file.content} label="Copy" ariaLabel={`Copy ${file.filename}`} />
+          <button
+            className="copy-button"
+            type="button"
+            onClick={() => downloadText(file.filename, file.content)}
+            aria-label={`Download ${file.filename}`}
+            title={`Download ${file.filename}`}
+          >
+            <Icon name="download" /> Download
           </button>
         </div>
       </header>

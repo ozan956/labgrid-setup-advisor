@@ -23,6 +23,7 @@ const ADDABLE_KINDS: DeviceKind[] = [
   'usb-serial', 'network-serial', 'network-pdu', 'ykush', 'usb-hub-port', 'manual-power',
   'usb-debugger', 'dfu', 'fastboot', 'usb-sd-mux', 'usb-storage', 'imx-usb-loader', 'network-service',
 ];
+const RESET_CONFIRM_MS = 4000;
 
 function blankDevice(kind: DeviceKind, id: string): BenchDevice {
   switch (kind) {
@@ -35,12 +36,29 @@ function blankDevice(kind: DeviceKind, id: string): BenchDevice {
     case 'usb-debugger': return { id, kind, label: 'Debug probe', match: { ID_SERIAL_SHORT: '' } };
     case 'dfu': return { id, kind, label: 'DFU bootloader', match: { ID_PATH: '' } };
     case 'fastboot': return { id, kind, label: 'Fastboot', match: { ID_PATH: '' }, usbId: { vendorId: '18d1', productId: '4ee0' } };
-    case 'usb-sd-mux': return { id, kind, label: 'USB-SD-Mux', match: { '@ID_PATH': '' } };
-    case 'usb-storage': return { id, kind, label: 'USB storage', match: { '@ID_PATH': '' } };
+    case 'usb-sd-mux': return { id, kind, label: 'USB-SD-Mux', match: { ID_PATH: '' } };
+    case 'usb-storage': return { id, kind, label: 'USB storage', match: { ID_PATH: '' } };
     case 'imx-usb-loader': return { id, kind, label: 'Serial download mode', match: { ID_PATH: '' } };
     case 'network-service': return { id, kind, label: 'SSH', address: '', username: 'root', port: 22 };
     default: return { id, kind: 'manual-power', label: 'Manual power' };
   }
+}
+
+/** FileReader works in every browser and in jsdom; Blob.text() is not available everywhere. */
+function readFileText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(reader.error ?? new Error('The file could not be read.'));
+    reader.readAsText(file);
+  });
+}
+
+function describeImportError(error: string): string {
+  // Ajv messages look like "/devices/0/kind must be equal to one of the allowed values".
+  const match = /^(\/\S*)\s+(.*)$/.exec(error);
+  if (match) return `In the file, ${match[1] === '/' ? 'the top level' : match[1].replace(/^\//, '').replace(/\//g, ' › ')} ${match[2]}.`;
+  return error.endsWith('.') ? error : `${error}.`;
 }
 
 function PresetFacts({ preset, onApply }: { preset: BoardPreset; onApply: () => void }) {
@@ -79,9 +97,11 @@ function PresetFacts({ preset, onApply }: { preset: BoardPreset; onApply: () => 
 
 export function BenchEditor({ profile, catalog, onChange, onPlan, onReset, onExit }: Props) {
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const resetTimer = useRef<number>(undefined);
   const [groupFollowsPlace, setGroupFollowsPlace] = useState(profile.names.group === profile.names.place);
   const [confirmReset, setConfirmReset] = useState(false);
   const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [importStatus, setImportStatus] = useState('');
   const [addKind, setAddKind] = useState<DeviceKind>('usb-serial');
   const boards = searchBoards(catalog, '');
   const preset = profile.board.presetId ? findBoard(catalog, profile.board.presetId) : undefined;
@@ -89,6 +109,8 @@ export function BenchEditor({ profile, catalog, onChange, onPlan, onReset, onExi
   useEffect(() => {
     headingRef.current?.focus();
   }, []);
+
+  useEffect(() => () => window.clearTimeout(resetTimer.current), []);
 
   function update(changes: Partial<BenchProfile>): void {
     onChange({ ...profile, ...changes });
@@ -150,27 +172,53 @@ export function BenchEditor({ profile, catalog, onChange, onPlan, onReset, onExi
     update({ bootloader: { kind, prompt } });
   }
 
+  function requestReset(): void {
+    if (confirmReset) {
+      window.clearTimeout(resetTimer.current);
+      setConfirmReset(false);
+      setGroupFollowsPlace(true);
+      setImportErrors([]);
+      setImportStatus('');
+      onReset();
+      return;
+    }
+    setConfirmReset(true);
+    resetTimer.current = window.setTimeout(() => setConfirmReset(false), RESET_CONFIRM_MS);
+  }
+
   async function importJson(event: ChangeEvent<HTMLInputElement>): Promise<void> {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    setImportStatus('');
+    let text: string;
     try {
-      const parsed: unknown = JSON.parse(await file.text());
-      const { profile: imported, errors } = validateProfile(parsed);
-      if (imported) {
-        setImportErrors([]);
-        setGroupFollowsPlace(imported.names.group === imported.names.place);
-        onChange(imported);
-      } else {
-        setImportErrors(errors);
-      }
-    } catch (error) {
-      setImportErrors([error instanceof Error ? error.message : 'The file is not valid JSON.']);
+      text = await readFileText(file);
+    } catch {
+      setImportErrors(['The file could not be read.']);
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      setImportErrors(['The file is not valid JSON.']);
+      return;
+    }
+    const { profile: imported, errors } = validateProfile(parsed);
+    if (imported) {
+      setImportErrors([]);
+      setGroupFollowsPlace(imported.names.group === imported.names.place);
+      onChange(imported);
+      setImportStatus(`Imported ${imported.devices.length} ${imported.devices.length === 1 ? 'device' : 'devices'} for ${imported.board.name.trim() || 'an unnamed board'}.`);
+    } else {
+      setImportErrors(errors.map(describeImportError));
     }
   }
 
   const placeValid = NAME_PATTERN.test(profile.names.place);
   const groupValid = NAME_PATTERN.test(profile.names.group);
+  const canPlan = placeValid && groupValid;
 
   return (
     <main id="main-content" className="bench-page page-shell">
@@ -193,7 +241,7 @@ export function BenchEditor({ profile, catalog, onChange, onPlan, onReset, onExi
             <input id="board-name" list="board-names" value={profile.board.name} placeholder="Raspberry Pi 4" onChange={(event) => chooseBoardName(event.target.value)} />
             <datalist id="board-names">{boards.map((board) => <option key={board.id} value={board.name} />)}</datalist>
           </Field>
-          <Field id="board-preset" label="Known boards">
+          <Field id="board-preset" label="Known boards" hint="Picking a board fills the name and shows what the advisor knows about it.">
             <select id="board-preset" value={profile.board.presetId ?? ''} onChange={(event) => choosePreset(event.target.value)}>
               <option value="">Not in the list</option>
               {[...new Set(boards.map((board) => board.vendor))].map((vendor) => (
@@ -268,7 +316,11 @@ export function BenchEditor({ profile, catalog, onChange, onPlan, onReset, onExi
         <div className="field-grid">
           <Field id="place-name" label="Place name" hint="Letters, digits, '-', '_' and '.' only. The name you will pass to labgrid-client -p.">
             <input id="place-name" value={profile.names.place} aria-invalid={!placeValid} onChange={(event) => updateNames({ place: event.target.value })} />
-            {!placeValid && <small className="field-error" role="alert">Use letters, digits, '-', '_' or '.' only.</small>}
+            {!placeValid && (
+              <small className="field-error" role="alert">
+                {profile.names.place.trim() === '' ? 'A place name is required.' : "Use letters, digits, '-', '_' or '.' only."}
+              </small>
+            )}
           </Field>
           <Field id="group-name" label="Exporter group" hint="Groups the resources of one board in exporter.yaml.">
             <input id="group-name" value={profile.names.group} disabled={groupFollowsPlace} aria-invalid={!groupValid} onChange={(event) => updateNames({ group: event.target.value })} />
@@ -283,6 +335,11 @@ export function BenchEditor({ profile, catalog, onChange, onPlan, onReset, onExi
               />
               Same as place
             </label>
+            {!groupValid && !groupFollowsPlace && (
+              <small className="field-error" role="alert">
+                {profile.names.group.trim() === '' ? 'A group name is required.' : "Use letters, digits, '-', '_' or '.' only."}
+              </small>
+            )}
           </Field>
           <Field id="location" label="Location (optional)" hint="Free text shown next to the place, for example a rack or desk.">
             <input id="location" value={profile.names.location} placeholder="Rack 2, shelf 3" onChange={(event) => updateNames({ location: event.target.value })} />
@@ -298,7 +355,7 @@ export function BenchEditor({ profile, catalog, onChange, onPlan, onReset, onExi
         </label>
         {profile.login && (
           <div className="field-grid">
-            <Field id="login-username" label="Username">
+            <Field id="login-username" label="Username" hint="The Linux user Labgrid logs in as.">
               <input id="login-username" value={profile.login.username} onChange={(event) => update({ login: { ...profile.login!, username: event.target.value } })} />
             </Field>
             <Field id="login-prompt" label="Login prompt" hint="Text printed before the username is asked.">
@@ -310,7 +367,7 @@ export function BenchEditor({ profile, catalog, onChange, onPlan, onReset, onExi
           </div>
         )}
         <div className="field-grid">
-          <Field id="bootloader-kind" label="Bootloader">
+          <Field id="bootloader-kind" label="Bootloader" hint="Needed when tests should stop in U-Boot or barebox before Linux boots.">
             <select id="bootloader-kind" value={profile.bootloader?.kind ?? 'none'} onChange={(event) => chooseBootloader(event.target.value as 'none' | 'uboot' | 'barebox')}>
               <option value="none">None or not needed</option>
               <option value="uboot">U-Boot</option>
@@ -332,21 +389,9 @@ export function BenchEditor({ profile, catalog, onChange, onPlan, onReset, onExi
         </div>
       )}
 
-      <nav className="bench-actions" aria-label="Bench actions">
+      <div className="bench-actions" role="group" aria-label="Bench actions">
         <div className="bench-actions-secondary">
-          <button
-            className="text-button danger"
-            type="button"
-            onClick={() => {
-              if (confirmReset) {
-                setConfirmReset(false);
-                onReset();
-              } else {
-                setConfirmReset(true);
-                window.setTimeout(() => setConfirmReset(false), 4000);
-              }
-            }}
-          >
+          <button className="text-button danger" type="button" onClick={requestReset} aria-describedby="reset-status">
             {confirmReset ? 'Really reset?' : 'Reset bench'}
           </button>
           <label className="text-button file-button">
@@ -356,11 +401,17 @@ export function BenchEditor({ profile, catalog, onChange, onPlan, onReset, onExi
           <button className="text-button" type="button" onClick={() => downloadText('bench-profile.json', JSON.stringify(profile, null, 2), 'application/json')}>
             Export JSON
           </button>
+          <span id="reset-status" className="action-status" role="status" aria-live="polite">
+            {confirmReset ? 'Click again within 4 seconds to confirm. This clears every device and name.' : importStatus}
+          </span>
         </div>
-        <button className="button primary large" type="button" onClick={onPlan} disabled={!placeValid || !groupValid}>
-          See my plan <Icon name="arrow" />
-        </button>
-      </nav>
+        <div className="bench-actions-primary">
+          {!canPlan && <span className="field-hint" id="plan-blocked">Fix the place or group name first.</span>}
+          <button className="button primary large" type="button" onClick={onPlan} disabled={!canPlan} aria-describedby={canPlan ? undefined : 'plan-blocked'}>
+            See my plan <Icon name="arrow" />
+          </button>
+        </div>
+      </div>
     </main>
   );
 }

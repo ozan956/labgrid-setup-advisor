@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Children, cloneElement, isValidElement, useEffect, useState, type ReactElement, type ReactNode } from 'react';
 import type { BenchDevice, DeviceKind, DeviceRole } from '../../bench/types';
 import { deviceRole } from '../../bench/profile';
 import { Icon } from '../Icons';
@@ -49,11 +49,14 @@ export function TargetBadge({ target }: { target: keyof typeof TARGET_LABELS }) 
 
 interface CopyButtonProps {
   text: string;
+  /** Visible label, e.g. 'Copy'. */
   label?: string;
+  /** Accessible name when the visible label is too generic, e.g. 'Copy exporter.yaml'. */
+  ariaLabel?: string;
   compact?: boolean;
 }
 
-export function CopyButton({ text, label = 'Copy', compact = false }: CopyButtonProps) {
+export function CopyButton({ text, label = 'Copy', ariaLabel, compact = false }: CopyButtonProps) {
   const [state, setState] = useState(label);
 
   async function copy(): Promise<void> {
@@ -63,11 +66,20 @@ export function CopyButton({ text, label = 'Copy', compact = false }: CopyButton
       window.setTimeout(() => setState(label), 1600);
     } catch {
       setState('Select and copy');
+      window.setTimeout(() => setState(label), 4000);
     }
   }
 
+  const name = ariaLabel && state === label ? ariaLabel : state;
   return (
-    <button className={`copy-button ${compact ? 'compact' : ''}`} onClick={copy} aria-live="polite" type="button">
+    <button
+      className={`copy-button ${compact ? 'compact' : ''}`}
+      onClick={copy}
+      aria-live="polite"
+      aria-label={name}
+      title={name}
+      type="button"
+    >
       <Icon name="copy" /> {state}
     </button>
   );
@@ -81,7 +93,8 @@ export function downloadBlob(filename: string, blob: Blob): void {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  // Some WebKit builds abort the download when the URL is revoked immediately.
+  window.setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 export function downloadText(filename: string, content: string, type = 'text/plain;charset=utf-8'): void {
@@ -99,7 +112,7 @@ export function CommandLine({ command }: { command: string }) {
   return (
     <div className="command-line">
       <pre><code>{command}</code></pre>
-      <CopyButton text={command} compact />
+      <CopyButton text={command} compact ariaLabel={`Copy command: ${command.slice(0, 60)}`} />
     </div>
   );
 }
@@ -108,15 +121,86 @@ interface FieldProps {
   id: string;
   label: string;
   hint?: string;
-  children: React.ReactNode;
+  children: ReactNode;
+}
+
+type ElementWithProps = ReactElement<{ id?: string; children?: ReactNode; 'aria-describedby'?: string }>;
+
+/** Adds aria-describedby to the element carrying the field id, looking one level into wrappers. */
+function describe(node: ReactNode, id: string, hintId: string): ReactNode {
+  return Children.map(node, (child) => {
+    if (!isValidElement(child)) return child;
+    const element = child as ElementWithProps;
+    if (element.props.id === id) {
+      const existing = element.props['aria-describedby'];
+      return cloneElement(element, { 'aria-describedby': existing ? `${existing} ${hintId}` : hintId });
+    }
+    if (typeof element.type === 'string' && element.props.children !== undefined) {
+      return cloneElement(element, {}, describe(element.props.children, id, hintId));
+    }
+    return child;
+  });
 }
 
 export function Field({ id, label, hint, children }: FieldProps) {
+  const hintId = `${id}-hint`;
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
-      {children}
-      {hint && <small id={`${id}-hint`}>{hint}</small>}
+      {hint ? describe(children, id, hintId) : children}
+      {hint && <small id={hintId}>{hint}</small>}
     </div>
+  );
+}
+
+interface NumberInputProps {
+  id: string;
+  value: number;
+  min?: number;
+  max?: number;
+  onCommit: (value: number) => void;
+  'aria-label'?: string;
+}
+
+/**
+ * A number field that keeps the text while the user edits (so it can be
+ * cleared) and only commits integers within range to the profile.
+ */
+export function NumberInput({ id, value, min = 1, max, onCommit, ...rest }: NumberInputProps) {
+  const [text, setText] = useState(String(value));
+  const [committed, setCommitted] = useState(value);
+  useEffect(() => {
+    if (value !== committed) {
+      setCommitted(value);
+      setText(String(value));
+    }
+  }, [value, committed]);
+
+  const parsed = Number(text);
+  const valid = text.trim() !== '' && Number.isInteger(parsed) && parsed >= min && (max === undefined || parsed <= max);
+
+  return (
+    <input
+      id={id}
+      type="number"
+      inputMode="numeric"
+      min={min}
+      max={max}
+      value={text}
+      aria-invalid={text.trim() !== '' && !valid ? true : undefined}
+      onChange={(event) => {
+        const next = event.target.value;
+        setText(next);
+        const number = Number(next);
+        if (next.trim() !== '' && Number.isInteger(number) && number >= min && (max === undefined || number <= max)) {
+          setCommitted(number);
+          onCommit(number);
+        }
+      }}
+      onBlur={() => {
+        if (!valid) setText(String(committed));
+      }}
+      {...rest}
+    />
   );
 }

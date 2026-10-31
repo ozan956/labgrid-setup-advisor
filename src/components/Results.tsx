@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { Prefill } from '../bench/types';
 import { createZip } from '../bench/zip';
 import { DecisionEngine, type PlaceholderValues } from '../engine/decision-engine';
@@ -23,6 +24,11 @@ const categoryLabels = {
 };
 
 export function Results({ definition, answers, values, prefill, onValuesChange, onEdit, onRestart }: Props) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, [definition.id]);
+
   const engine = new DecisionEngine(definition);
   const matches = engine.recommendations(answers);
   const configurations = engine.configurations(answers, values);
@@ -56,7 +62,7 @@ export function Results({ definition, answers, values, prefill, onValuesChange, 
       <section className="results-hero">
         <div>
           <div className="section-kicker">Your next steps</div>
-          <h1>Your {definition.title} setup</h1>
+          <h1 ref={headingRef} tabIndex={-1}>Your {definition.title} setup</h1>
           <p>Start with the recommendation below. Open technical details only when you need class names, commands, or wiring requirements.</p>
         </div>
         <div className="results-actions">
@@ -144,7 +150,7 @@ export function Results({ definition, answers, values, prefill, onValuesChange, 
             <p>{allReady ? 'Every value is filled in. Copy or download the files.' : 'Use these templates when you are ready to configure Labgrid.'}</p>
           </div>
           {configurations.length > 1 && (
-            <button className="button secondary" onClick={downloadAll}><Icon name="arrow" /> Download all (.zip)</button>
+            <button className="button secondary" onClick={downloadAll}><Icon name="download" /> Download all (.zip)</button>
           )}
         </div>
 

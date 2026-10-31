@@ -9,6 +9,8 @@ interface Props {
   answers: Answers;
   questionIndex: number;
   prefill?: Prefill;
+  /** Label of the exit button, e.g. '← All setups' or '← Your bench plan'. */
+  exitLabel?: string;
   onAnswer: (questionId: string, value: string) => void;
   onIndexChange: (index: number) => void;
   onComplete: () => void;
@@ -20,6 +22,7 @@ export function Wizard({
   answers,
   questionIndex,
   prefill,
+  exitLabel = '← All setups',
   onAnswer,
   onIndexChange,
   onComplete,
@@ -46,7 +49,7 @@ export function Wizard({
   return (
     <main id="main-content" className="wizard-page page-shell">
       <div className="wizard-topline">
-        <button className="text-button" onClick={onExit}>← All setups</button>
+        <button className="text-button" onClick={onExit}>{exitLabel}</button>
         <span>{definition.title}</span>
       </div>
       <div className="progress-wrap" aria-label={`Question ${safeIndex + 1} of ${visible.length}`}>

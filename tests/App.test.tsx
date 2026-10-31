@@ -1,7 +1,12 @@
+import { StrictMode } from 'react';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../src/App';
+
+function renderApp() {
+  return render(<StrictMode><App /></StrictMode>);
+}
 
 describe('core user journey', () => {
   beforeEach(() => {
@@ -13,7 +18,7 @@ describe('core user journey', () => {
   it('moves from landing to a remote network PDU recommendation and copies YAML', async () => {
     const user = userEvent.setup();
     const writeText = vi.spyOn(navigator.clipboard, 'writeText');
-    render(<App />);
+    renderApp();
 
     await user.click(screen.getByRole('button', { name: /open remote power control guide/i }));
 
@@ -42,7 +47,7 @@ describe('core user journey', () => {
 
   it('offers every setup workflow from the landing page', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp();
     expect(screen.getAllByRole('button', { name: /open .* guide/i })).toHaveLength(7);
     await user.click(screen.getByRole('button', { name: /open serial console access guide/i }));
     expect(screen.getByRole('heading', { name: /how do you connect to the board to see startup messages/i })).toBeInTheDocument();
@@ -50,7 +55,7 @@ describe('core user journey', () => {
 
   it('switches theme and remembers the choice', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp();
 
     await user.click(screen.getByRole('button', { name: /switch to dark mode/i }));
 
@@ -61,7 +66,7 @@ describe('core user journey', () => {
 
   it('gives a safe next step when a beginner does not know the serial interface', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    renderApp();
 
     await user.click(screen.getByRole('button', { name: /open serial console access guide/i }));
     await user.click(screen.getByRole('button', { name: /i am not sure yet/i }));

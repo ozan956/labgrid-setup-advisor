@@ -25,15 +25,16 @@ export function ConfigurationCard({ configuration }: { configuration: GeneratedC
           <code>{configuration.definition.filename}</code>
         </div>
         <div className="file-actions">
-          <button className="copy-button" onClick={copy} aria-live="polite">
+          <button className="copy-button" onClick={copy} aria-live="polite" title={copyState}>
             <Icon name="copy" /> {copyState}
           </button>
           <button
             className="copy-button"
             onClick={() => downloadText(configuration.definition.filename, configuration.content)}
             aria-label={`Download ${configuration.definition.filename}`}
+            title={`Download ${configuration.definition.filename}`}
           >
-            <Icon name="arrow" /> Download
+            <Icon name="download" /> Download
           </button>
         </div>
       </header>

@@ -12,6 +12,8 @@ interface Props {
   catalog: HardwareCatalog;
   prefills: Map<string, Prefill>;
   samples: SampleBench[];
+  /** One-line message shown at the top, e.g. when a share link could not be read. */
+  notice?: string;
   onSelect: (id: string) => void;
   onDescribe: () => void;
   onViewPlan: () => void;
@@ -19,12 +21,13 @@ interface Props {
   onLoadSample: (sample: SampleBench) => void;
 }
 
-export function Landing({ entries, profile, catalog, prefills, samples, onSelect, onDescribe, onViewPlan, onEditBench, onLoadSample }: Props) {
+export function Landing({ entries, profile, catalog, prefills, samples, notice, onSelect, onDescribe, onViewPlan, onEditBench, onLoadSample }: Props) {
   const [showSamples, setShowSamples] = useState(false);
   const hasBench = profile !== undefined && profile.devices.length > 0;
 
   return (
     <main id="main-content" className="landing-page page-shell">
+      {notice && <div className="detect-error landing-notice" role="alert">{notice}</div>}
       {hasBench && profile && (
         <section className="bench-strip" aria-label="Your bench">
           <div>
@@ -47,12 +50,12 @@ export function Landing({ entries, profile, catalog, prefills, samples, onSelect
             <button className="button primary large" onClick={onDescribe}>
               {hasBench ? 'Edit my bench' : 'Describe my bench'} <Icon name="arrow" />
             </button>
-            <button className="text-button" onClick={() => setShowSamples((current) => !current)} aria-expanded={showSamples}>
+            <button className="text-button" onClick={() => setShowSamples((current) => !current)} aria-expanded={showSamples} aria-controls="sample-list">
               Try an example bench
             </button>
           </div>
           {showSamples && (
-            <ul className="sample-list" aria-label="Example benches">
+            <ul className="sample-list" id="sample-list" aria-label="Example benches">
               {samples.map((sample) => (
                 <li key={sample.id}>
                   <button type="button" onClick={() => onLoadSample(sample)}>
