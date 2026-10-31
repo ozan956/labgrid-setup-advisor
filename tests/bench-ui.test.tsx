@@ -318,4 +318,34 @@ describe('bench journey', () => {
     await user.click(back);
     expect(screen.getByRole('heading', { name: /your bench plan/i })).toBeInTheDocument();
   });
+  it('shows how a preset was verified and lists its sources', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await openEmptyBench(user);
+
+    const picker = screen.getByLabelText(/known boards/i) as HTMLSelectElement;
+    expect(within(picker).getByRole('option', { name: /raspberry pi 4 model b \(from documentation\)/i })).toBeInTheDocument();
+    await user.selectOptions(picker, 'raspberry-pi-4');
+
+    const facts = within(screen.getByRole('complementary', { name: /raspberry pi 4 model b facts/i }));
+    expect(facts.getByText('From documentation')).toHaveClass('verification-badge', 'verification-docs');
+    expect(facts.queryByText(/not yet reviewed/i)).not.toBeInTheDocument();
+  });
+
+  it('offers the bench as a lab-verified board preset on the plan page', async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await loadSample(user);
+
+    expect(screen.getByRole('heading', { name: /contribute this board/i })).toBeInTheDocument();
+    const article = screen.getByRole('article', { name: /board preset \(board-raspberry-pi-4-model-b\.yaml\)/i });
+    const card = within(article);
+    expect(card.getByText(/passes the catalog schema/i)).toBeInTheDocument();
+    expect(article.querySelector('pre')?.textContent).toContain('    verification: lab\n');
+    expect(article.querySelector('pre')?.textContent).toContain('- id: raspberry-pi-4-model-b');
+    expect(card.getByText(/share it only after the checklist above passed/i)).toBeInTheDocument();
+
+    await user.click(card.getByRole('button', { name: /download board-raspberry-pi-4-model-b\.yaml/i }));
+    expect(URL.createObjectURL).toHaveBeenCalled();
+  });
 });

@@ -234,6 +234,15 @@ export function analyzeProfile(profile: BenchProfile, catalog: HardwareCatalog):
   }
 
   if (board) {
+    if (board.verification === 'unverified') {
+      insights.push({
+        id: 'board-unverified',
+        severity: 'warning',
+        title: `${board.name}: preset not yet reviewed`,
+        detail: `The facts for this board were imported from source trees (${(board.sources ?? []).join(', ') || 'no sources recorded'}) and nobody has confirmed them on hardware or against the vendor documentation. Check the console speed${board.bootloader?.prompt ? ` and the bootloader prompt "${board.bootloader.prompt}"` : ''} before relying on the generated files, and use "Contribute this board" below once the bench works.`,
+        docs: board.docs,
+      });
+    }
     if (board.console.note) {
       insights.push({
         id: 'board-console-hint',

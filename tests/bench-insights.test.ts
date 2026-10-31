@@ -24,6 +24,10 @@ const catalog: HardwareCatalog = {
       bootloader: { kind: 'uboot', prompt: 'U-Boot> ', note: 'Only when you install U-Boot yourself.' },
     },
     { id: 'stm32-nucleo-64', name: 'STM32 Nucleo-64', vendor: 'ST', family: 'stm32', verification: 'docs', console: { interface: 'cdc-acm', speed: 115200, chip: 'stlink' }, power: { inputs: ['micro-usb'] } },
+    {
+      id: 'imported-board', name: 'Imported board', vendor: 'X', family: 'x', verification: 'unverified', sources: ['u-boot: configs/imported_defconfig'],
+      console: { interface: 'uart-header', speed: 115200 }, power: { inputs: ['other'] }, bootloader: { kind: 'uboot', prompt: '=> ' },
+    },
   ],
 };
 
@@ -151,6 +155,15 @@ describe('bench insights', () => {
     expect(found).toEqual(expect.arrayContaining(['board-console-hint', 'board-power-hint', 'board-bootloader-hint']));
     const withBootloader = profile({ board: { name: 'Pi', presetId: 'raspberry-pi-4' }, bootloader: { kind: 'uboot', prompt: 'U-Boot> ' } }, [ftdi]);
     expect(ids(analyzeProfile(withBootloader, catalog))).not.toContain('board-bootloader-hint');
+  });
+
+  it('warns when the chosen preset was imported and not yet reviewed', () => {
+    const imported = analyzeProfile(profile({ board: { name: 'Imported', presetId: 'imported-board' } }, [ftdi]), catalog);
+    const warning = imported.find((insight) => insight.id === 'board-unverified');
+    expect(warning?.severity).toBe('warning');
+    expect(warning?.detail).toContain('configs/imported_defconfig');
+    expect(warning?.detail).toContain('"=> "');
+    expect(ids(analyzeProfile(profile({ board: { name: 'Pi', presetId: 'raspberry-pi-4' } }, [ftdi]), catalog))).not.toContain('board-unverified');
   });
 
   it('links login settings to a console and announces strategies', () => {

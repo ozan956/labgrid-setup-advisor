@@ -3,13 +3,15 @@ import type { BenchProfile, HardwareCatalog, Insight, Prefill } from '../../benc
 import { buildChecklist } from '../../bench/checklist';
 import { generateBenchFiles } from '../../bench/generate';
 import { analyzeProfile } from '../../bench/insights';
+import { validateBoardPreset } from '../../bench/catalog';
+import { boardPresetFromProfile, renderBoardPresetYaml } from '../../bench/preset';
 import { encodeShareHash, summarizeProfile } from '../../bench/storage';
 import { createZip } from '../../bench/zip';
 import type { CatalogEntry } from '../../data';
 import { Icon } from '../Icons';
 import { BenchDiagram } from './BenchDiagram';
 import { GeneratedFileCard } from './GeneratedFileCard';
-import { CommandLine, TargetBadge, downloadBytes, downloadText } from './shared';
+import { CommandLine, CopyButton, TargetBadge, downloadBytes, downloadText } from './shared';
 
 interface Props {
   profile: BenchProfile;
@@ -54,6 +56,10 @@ export function BenchPlan({ profile, catalog, entries, prefills, shared = false,
   const files = useMemo(() => generateBenchFiles(profile, catalog), [profile, catalog]);
   const insights = useMemo(() => analyzeProfile(profile, catalog), [profile, catalog]);
   const steps = useMemo(() => buildChecklist(profile, catalog, files), [profile, catalog, files]);
+  const boardPreset = useMemo(() => boardPresetFromProfile(profile, catalog), [profile, catalog]);
+  const presetYaml = useMemo(() => renderBoardPresetYaml(boardPreset), [boardPreset]);
+  const presetErrors = useMemo(() => validateBoardPreset(boardPreset), [boardPreset]);
+  const presetFilename = `board-${boardPreset.id}.yaml`;
   const [done, setDone] = useState<Set<string>>(() => loadDone(profile.names.place));
 
   useEffect(() => {
@@ -100,6 +106,7 @@ export function BenchPlan({ profile, catalog, entries, prefills, shared = false,
   const relevant = entries.filter((entry) => prefills.get(entry.id)?.relevance);
   const others = entries.filter((entry) => !prefills.get(entry.id)?.relevance);
   const doneCount = steps.filter((step) => done.has(step.id)).length;
+  const hasBoardName = profile.board.name.trim().length > 0;
 
   return (
     <main id="main-content" className="plan-page page-shell">
@@ -251,6 +258,49 @@ export function BenchPlan({ profile, catalog, entries, prefills, shared = false,
           </details>
         )}
       </section>
+
+      {hasBoardName && (
+        <section className="result-section" aria-labelledby="contribute-heading">
+          <div className="result-section-heading">
+            <div><h2 id="contribute-heading">Contribute this board</h2><p>Turn your bench into a board preset so the next person with this board starts from facts that ran in a lab.</p></div>
+          </div>
+          <article className="config-card generated-file" aria-label={`Board preset (${presetFilename})`}>
+            <header>
+              <div>
+                <span className="file-kind preset">preset</span>
+                <h3>Board preset for the hardware catalog</h3>
+                <code>{presetFilename}</code>
+                <TargetBadge target="anywhere" />
+              </div>
+              <div className="file-actions">
+                <CopyButton text={presetYaml} label="Copy" ariaLabel={`Copy ${presetFilename}`} />
+                <button
+                  className="copy-button"
+                  type="button"
+                  onClick={() => downloadText(presetFilename, presetYaml)}
+                  aria-label={`Download ${presetFilename}`}
+                  title={`Download ${presetFilename}`}
+                >
+                  <Icon name="download" /> Download
+                </button>
+              </div>
+            </header>
+            <p className="file-description">
+              The entry is marked <code>verification: lab</code>, which tells readers this bench really ran, so share it only after the checklist above passed.
+              Paste it under <code>boards:</code> in <code>src/data/hardware/boards.yaml</code> of the advisor repository and open a pull request, or send the file to the repository maintainer.
+            </p>
+            {presetErrors.length > 0 ? (
+              <div className="template-notice">
+                <strong>Fix before sharing</strong>
+                <span>{presetErrors.join('; ')}</span>
+              </div>
+            ) : (
+              <div className="ready-notice"><Icon name="check" /> Passes the catalog schema</div>
+            )}
+            <pre tabIndex={0}><code>{presetYaml}</code></pre>
+          </article>
+        </section>
+      )}
     </main>
   );
 }

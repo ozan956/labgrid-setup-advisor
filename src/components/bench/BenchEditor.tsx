@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import type { BenchDevice, BenchProfile, BoardPreset, DeviceKind, HardwareCatalog } from '../../bench/types';
+import type { BenchDevice, BenchProfile, BoardPreset, BoardVerification, DeviceKind, HardwareCatalog } from '../../bench/types';
 import { findBoard, searchBoards } from '../../bench/catalog';
 import { DEFAULT_COORDINATOR, NAME_PATTERN, nextDeviceId } from '../../bench/profile';
 import { validateProfile } from '../../bench/storage';
@@ -24,6 +24,19 @@ const ADDABLE_KINDS: DeviceKind[] = [
   'usb-debugger', 'dfu', 'fastboot', 'usb-sd-mux', 'usb-storage', 'imx-usb-loader', 'network-service',
 ];
 const RESET_CONFIRM_MS = 4000;
+
+/** Plain wording for how a preset's facts were confirmed. */
+export const VERIFICATION_LABELS: Record<BoardVerification, string> = {
+  lab: 'Verified on hardware',
+  docs: 'From documentation',
+  unverified: 'Imported, not yet reviewed',
+};
+
+const VERIFICATION_OPTION_SUFFIX: Record<BoardVerification, string> = {
+  lab: 'verified on hardware',
+  docs: 'from documentation',
+  unverified: 'not yet reviewed',
+};
 
 function blankDevice(kind: DeviceKind, id: string): BenchDevice {
   switch (kind) {
@@ -64,7 +77,15 @@ function describeImportError(error: string): string {
 function PresetFacts({ preset, onApply }: { preset: BoardPreset; onApply: () => void }) {
   return (
     <aside className="preset-facts" aria-label={`${preset.name} facts`}>
-      <h3>{preset.name}</h3>
+      <div className="preset-heading">
+        <h3>{preset.name}</h3>
+        <span className={`verification-badge verification-${preset.verification}`}>{VERIFICATION_LABELS[preset.verification]}</span>
+      </div>
+      {preset.verification === 'unverified' && (
+        <p className="verification-hint">
+          These facts were imported from source trees and nobody has reviewed them yet; confirm the console speed and the bootloader prompt against your board before relying on them.
+        </p>
+      )}
       <dl>
         <dt>Console</dt>
         <dd>
@@ -89,6 +110,9 @@ function PresetFacts({ preset, onApply }: { preset: BoardPreset; onApply: () => 
       {preset.notes && preset.notes.length > 0 && <ul>{preset.notes.map((note) => <li key={note}>{note}</li>)}</ul>}
       {preset.docs && preset.docs.length > 0 && (
         <p className="preset-docs">{preset.docs.map((doc) => <a key={doc.url} href={doc.url} target="_blank" rel="noreferrer">{doc.title} ↗</a>)}</p>
+      )}
+      {preset.sources && preset.sources.length > 0 && (
+        <p className="preset-sources"><span>Sources:</span>{preset.sources.map((source) => <code key={source}>{source}</code>)}</p>
       )}
       <button className="button secondary" type="button" onClick={onApply}>Apply preset defaults</button>
     </aside>
@@ -246,7 +270,9 @@ export function BenchEditor({ profile, catalog, onChange, onPlan, onReset, onExi
               <option value="">Not in the list</option>
               {[...new Set(boards.map((board) => board.vendor))].map((vendor) => (
                 <optgroup key={vendor} label={vendor}>
-                  {boards.filter((board) => board.vendor === vendor).map((board) => <option key={board.id} value={board.id}>{board.name}</option>)}
+                  {boards.filter((board) => board.vendor === vendor).map((board) => (
+                    <option key={board.id} value={board.id}>{board.name} ({VERIFICATION_OPTION_SUFFIX[board.verification]})</option>
+                  ))}
                 </optgroup>
               ))}
             </select>

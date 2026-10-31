@@ -129,6 +129,7 @@ critical, warning, info, success. Per-device rules use `rule:deviceId` ids.
 | `remote-coordinator-address` | info | Non-default coordinator; set `LG_COORDINATOR` or `-x`. |
 | `team-sharing` | info | Places, acquire/release, tags, reservations. |
 | `board-console-hint`, `board-power-hint`, `board-bootloader-hint` | info | Facts from the board preset. |
+| `board-unverified` | warning | The chosen preset was imported mechanically and not yet reviewed; confirm speed and prompt. |
 | `unsupported-devices` | info | Devices Labgrid cannot control. |
 | `strategy-ready` | success | Power, console, and login present; a strategy is generated. |
 | `ready` | success | No critical insight and at least one console or power device. |
@@ -240,6 +241,31 @@ Imported JSON and decoded links are validated against
 `schemas/bench-profile.schema.json`, which uses `kind` as a discriminator and
 rejects unknown fields and duplicate device ids. The advisor never asks for
 passwords; a profile should not contain any.
+
+## Verification badge and contributing a board
+
+Every board preset carries a `verification` level, shown as a badge next to
+the preset facts and as a suffix in the "Known boards" list: `lab` ("Verified
+on hardware") means the facts came from a bench that ran with Labgrid, `docs`
+("From documentation") means they were taken from vendor documentation or
+source trees, and `unverified` ("Imported, not yet reviewed") marks
+mechanically imported entries, which get a cautionary hint asking the user to
+confirm the console speed and bootloader prompt. Optional `sources` pointers
+are listed under the facts.
+
+The plan page ends with a "Contribute this board" card whenever the bench has
+a board name. `boardPresetFromProfile()` in `src/bench/preset.ts` derives a
+`verification: lab` entry from the bench: the console speed and converter chip
+come from the first console device (a debug probe's virtual COM port becomes
+`cdc-acm`), flashing methods from the device kinds, the bootloader from the
+profile, and the power connector, tags and documentation from the preset the
+user picked (falling back to `other` and "Unknown vendor" when there was none).
+`renderBoardPresetYaml()` prints it as one `boards:` list item in the
+catalog's style and `validateBoardPreset()` checks it against
+`schemas/hardware-boards.schema.json`. The card offers copy and download
+(`board-<id>.yaml`) and asks the user to share the entry only after the
+checklist passed, by pasting it into `src/data/hardware/boards.yaml` in a pull
+request or sending it to the repository maintainer.
 
 ## Sample benches and validation
 

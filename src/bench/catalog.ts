@@ -119,6 +119,13 @@ export function loadHardwareCatalog(sources: HardwareCatalogSources): HardwareCa
   return { usbDevices, pduModels, boards };
 }
 
+/** Schema and id errors for one board entry as it would appear under `boards:` in the catalog. */
+export function validateBoardPreset(preset: BoardPreset): string[] {
+  const shape = shapeErrors('board', validateBoards, { schemaVersion: 1, boards: [preset] })
+    .map((error) => error.replace(/^board\/boards\/0/, 'board'));
+  return [...shape, ...boardErrors([preset])];
+}
+
 export function findUsbDevice(catalog: HardwareCatalog, id: UsbId): UsbDeviceEntry | undefined {
   const vendorId = id.vendorId.trim().toLowerCase();
   const productId = id.productId.trim().toLowerCase();

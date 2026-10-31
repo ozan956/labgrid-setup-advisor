@@ -1,6 +1,8 @@
 export * from './types';
 export * from './profile';
-export { hardwareCatalog, loadHardwareCatalog, findUsbDevice, findPduModel, findBoard, searchBoards, HardwareCatalogError } from './catalog';
+export { hardwareCatalog, loadHardwareCatalog, findUsbDevice, findPduModel, findBoard, searchBoards, validateBoardPreset, HardwareCatalogError } from './catalog';
+export { boardPresetFromProfile, renderBoardPresetYaml, boardIdFromName } from './preset';
+export type { BoardPresetOptions } from './preset';
 export { parseLsusb } from './parsers/lsusb';
 export { parseUdevadm } from './parsers/udevadm';
 export { parseLabgridSuggest } from './parsers/suggest';

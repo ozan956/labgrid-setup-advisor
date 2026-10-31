@@ -387,6 +387,15 @@ input:disabled { opacity: .6; }
 .preset-facts dd { margin: 0; color: var(--muted); line-height: 1.5; }
 .preset-facts ul { margin: 12px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.5; }
 .preset-facts .button { margin-top: 14px; }
+.preset-facts .preset-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 10px; }
+.preset-facts .preset-heading h3 { margin: 0; }
+.verification-badge { display: inline-flex; align-items: center; padding: 3px 7px; border-radius: 4px; border: 1px solid var(--line); font: 10px var(--font); text-transform: uppercase; letter-spacing: .06em; font-weight: 700; white-space: nowrap; }
+.verification-badge.verification-lab { color: var(--success); border-color: var(--success-border); background: var(--success-background); }
+.verification-badge.verification-docs { color: var(--muted); background: var(--panel); }
+.verification-badge.verification-unverified { color: var(--warning-text); border-color: var(--warning-border); background: var(--warning-background); }
+.verification-hint { margin: 0 0 12px; padding: 8px 11px; color: var(--warning-text); background: var(--warning-background); border: 1px solid var(--warning-border); border-radius: 6px; font-size: 12px; line-height: 1.5; }
+.preset-sources { margin: 10px 0 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: 11px; color: var(--dim); }
+.preset-sources code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; color: var(--muted); }
 .preset-docs { margin: 12px 0 0; display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; }
 .preset-docs a, .insight-docs a { color: var(--lime); text-decoration: none; }
 .preset-docs a:hover, .insight-docs a:hover { text-decoration: underline; }
@@ -524,6 +533,7 @@ h1[tabindex="-1"]:focus { outline: none; }
 .generated-file header > div { grid-template-columns: auto auto auto; }
 .generated-file header .target-badge { grid-column: 3; grid-row: 1 / 3; align-self: center; }
 .file-kind.service, .file-kind.notes, .file-kind.profile, .file-kind.script { color: var(--muted); }
+.file-kind.preset { color: var(--success); border-color: var(--success-border); }
 .ready-notice { padding: 11px 19px; display: flex; align-items: center; gap: 8px; color: var(--success); background: var(--success-background); border-bottom: 1px solid var(--success-border); font-size: 12px; font-weight: 700; }
 .file-disclosure > summary { padding: 12px 19px; color: var(--lime); font-size: 13px; font-weight: 600; cursor: pointer; }
 
