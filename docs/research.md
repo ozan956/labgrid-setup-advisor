@@ -207,9 +207,9 @@ The advisor complements that work without requiring changes to the PR:
 
 ## Extended research (2026-10-31, v26.0-281-ge6e0754c)
 
-The bench feature was researched against the local upstream checkout at
-`/home/odurgut/work/labgrid` (`git describe --tags` prints
-`v26.0-281-ge6e0754c`). File paths below are relative to that checkout.
+The bench feature was researched against a local checkout of upstream
+Labgrid at `v26.0-281-ge6e0754c` (`git describe --tags`). File paths below
+are relative to that checkout.
 
 ### udev matching (`labgrid/resource/udev.py`, `doc/configuration.rst` "udev Matching")
 

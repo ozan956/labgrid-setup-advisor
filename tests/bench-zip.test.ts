@@ -1,6 +1,7 @@
 /// <reference types="node" />
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { crc32, createZip } from '../src/bench/zip';
@@ -63,15 +64,19 @@ describe('createZip', () => {
 
   it('produces an archive Python can read back', () => {
     if (!hasPython()) return;
-    const dir = join('/tmp/claude-1000/-home-odurgut-work-labgrid-labgrid-setup-advisor/d977ecd2-3156-4704-bc53-c47ed2a1b3ea/scratchpad', 'zip-test');
-    mkdirSync(dir, { recursive: true });
+    const dir = mkdtempSync(join(tmpdir(), 'labgrid-advisor-zip-'));
     const path = join(dir, 'bundle.zip');
     writeFileSync(path, createZip(entries));
-    const output = execFileSync(
-      'python3',
-      ['-I', '-c', "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1]); print(z.testzip()); print(sorted(z.namelist())); print(z.read('SETUP.md').decode())", path],
-      { encoding: 'utf8' },
-    );
+    let output: string;
+    try {
+      output = execFileSync(
+        'python3',
+        ['-I', '-c', "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1]); print(z.testzip()); print(sorted(z.namelist())); print(z.read('SETUP.md').decode())", path],
+        { encoding: 'utf8' },
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
     expect(output).toContain('None');
     expect(output).toContain("['SETUP.md', 'exporter.yaml']");
     expect(output).toContain('Ünicode ✓');
