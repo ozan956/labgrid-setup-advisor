@@ -9,7 +9,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "tsc -b --pretty false",
-    "validate:labgrid": "node scripts/validate-labgrid-configs.mjs"
+    "validate:labgrid": "node scripts/validate-labgrid-configs.mjs",
+    "import:boards": "node scripts/import-board-candidates.mjs --seeds scripts/board-seeds.yaml"
   },
   "dependencies": {
     "@fontsource/barlow": "^5.2.8",

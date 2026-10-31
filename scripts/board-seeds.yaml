@@ -1,0 +1,720 @@
+# Seeds for scripts/import-board-candidates.mjs.
+#
+# Each seed names a board and points at the files in the local source trees
+# that describe it. The script extracts facts (U-Boot prompt and baud rate,
+# Linux console UART, OpenOCD probe) and merges them with the hand-written
+# fields below, which win over derived values. `curation` is ignored by the
+# script; it records the verification level the curator intends to set after
+# checking the documentation linked in `docs` (unverified when only the trees
+# were consulted).
+#
+# Pointers: uboot = configs/<uboot>_defconfig, dts = arch/*/boot/dts/<dts>.dts
+# (defaults to CONFIG_DEFAULT_DEVICE_TREE), buildroot = configs/<buildroot>_defconfig,
+# openocd = tcl/board/<openocd>.cfg, openocdTarget = tcl/target/<name>.cfg.
+schemaVersion: 1
+seeds:
+  # ---------------------------------------------------------------- ST
+  - id: stm32-nucleo-144
+    name: STM32 Nucleo-144 (any variant)
+    vendor: STMicroelectronics
+    family: stm32
+    openocd: st_nucleo_f7
+    curation: docs
+    console:
+      interface: cdc-acm
+      chip: stlink
+      note: The on-board ST-LINK/V2-1 or STLINK-V3E exposes a virtual COM port wired to the target UART (/dev/ttyACM*), so one USB cable gives console and debugger.
+    power:
+      inputs: [micro-usb, usb-c]
+      note: Powered from the ST-LINK USB connector by default; a YKUSH or switchable hub port can power-cycle it. Jumpers select external 5 V or VIN instead.
+    flashing: [openocd]
+    tags: [cortex-m, mcu, evk]
+    notes:
+      - OpenOCD scripts live under board/st_nucleo_*.cfg (f7, h743zi, h745zi, l4 and others); pick the one matching your MCU family.
+    docs:
+      - title: STM32 Nucleo boards
+        url: https://www.st.com/en/evaluation-tools/stm32-nucleo-boards.html
+  - id: stm32f4-discovery
+    name: STM32F4DISCOVERY / STM32F407G-DISC1
+    vendor: STMicroelectronics
+    family: stm32
+    openocd: stm32f4discovery
+    curation: docs
+    console:
+      interface: cdc-acm
+      chip: stlink
+      note: The STM32F407G-DISC1 revision has an ST-LINK/V2-A with a virtual COM port; the original STM32F4DISCOVERY ST-LINK/V2 has no VCP, so wire a 3.3 V USB-UART adapter to the UART pins on that revision.
+    power:
+      inputs: [other]
+      note: 5 V over the ST-LINK mini-USB connector (CN1); a switchable hub port or YKUSH can power-cycle it.
+    flashing: [openocd]
+    tags: [cortex-m, mcu, evk]
+    docs:
+      - title: STM32F4DISCOVERY
+        url: https://www.st.com/en/evaluation-tools/stm32f4discovery.html
+  - id: stm32f746g-disco
+    name: STM32F746G-DISCO Discovery kit
+    vendor: STMicroelectronics
+    family: stm32
+    openocd: stm32f746g-disco
+    curation: docs
+    console:
+      interface: cdc-acm
+      chip: stlink
+      note: The on-board ST-LINK/V2-1 provides a virtual COM port on the ST-LINK mini-USB connector (/dev/ttyACM*).
+    power:
+      inputs: [other]
+      note: 5 V over the ST-LINK mini-USB connector or the USB OTG connectors, selected with the power jumper; a switchable hub port or YKUSH can power-cycle it.
+    flashing: [openocd]
+    tags: [cortex-m, mcu, evk]
+    docs:
+      - title: STM32F746G-DISCO
+        url: https://www.st.com/en/evaluation-tools/32f746gdiscovery.html
+  - id: stm32mp135f-dk
+    name: STM32MP135F-DK Discovery kit
+    vendor: STMicroelectronics
+    family: stm32mp
+    uboot: stm32mp13
+    buildroot: stm32mp135f_dk
+    curation: docs
+    console:
+      interface: onboard-usb
+      chip: stlink
+      note: The on-board STLINK-V3E provides the console as a CDC ACM port (/dev/ttyACM*) and a debugger on the same USB cable.
+    power:
+      inputs: [usb-c]
+      note: 5 V / 3 A over the dedicated USB-C power connector.
+    flashing: [sd-card, dfu]
+    tags: [arm, linux, evk]
+    notes:
+      - Setting the boot switches to USB boot exposes the ROM code as DFU device 0483:df11 for STM32CubeProgrammer.
+    docs:
+      - title: STM32MP135F-DK
+        url: https://www.st.com/en/evaluation-tools/stm32mp135f-dk.html
+  - id: stm32mp157d-dk1
+    name: STM32MP157D-DK1 Discovery kit
+    vendor: STMicroelectronics
+    family: stm32mp
+    uboot: stm32mp15
+    dts: st/stm32mp157a-dk1
+    buildroot: stm32mp157a_dk1
+    curation: docs
+    console:
+      interface: onboard-usb
+      chip: stlink
+      note: The on-board ST-LINK/V2-1 provides the console as a CDC ACM port (/dev/ttyACM*) and a debugger on the same micro-USB cable.
+    power:
+      inputs: [usb-c]
+      note: 5 V / 3 A over the dedicated USB-C power connector.
+    flashing: [sd-card, dfu]
+    tags: [arm, linux, evk]
+    notes:
+      - The kernel device tree is shared with the STM32MP157A-DK1; the D revision only changes the SoC speed grade.
+      - Setting the boot switches to USB boot exposes the ROM code as DFU device 0483:df11 for STM32CubeProgrammer.
+    docs:
+      - title: STM32MP157D-DK1
+        url: https://www.st.com/en/evaluation-tools/stm32mp157d-dk1.html
+
+  # ---------------------------------------------------------------- NXP
+  - id: nxp-imx8mp-evk
+    name: NXP i.MX 8M Plus EVK
+    vendor: NXP
+    family: imx
+    uboot: imx8mp_evk
+    buildroot: imx8mp-evk
+    openocd: nxp_imx8mp-evk
+    curation: docs
+    console:
+      interface: onboard-usb
+      chip: ftdi
+      note: The debug micro-USB connector carries a multi-channel FTDI bridge that appears as several ttyUSB ports; the Cortex-A console is usually the third one (ID_USB_INTERFACE_NUM '02') and the Cortex-M7 console the fourth. Verify with the quick start guide and pin the match.
+    power:
+      inputs: [usb-c]
+      note: USB-C power-delivery supply (the kit ships a 65 W adapter); switch the mains adapter or use a PD-capable switched outlet.
+    flashing: [sd-card, uuu]
+    tags: [arm64, linux, evk]
+    notes:
+      - Serial download mode (boot switches) exposes the SoC as 1fc9:0146 for UUUDriver bootstrap.
+      - OpenOCD has board/nxp_imx8mp-evk.cfg for the Cortex-A cores over an external JTAG probe.
+    docs:
+      - title: 8MPLUSLPD4-EVK
+        url: https://www.nxp.com/design/design-center/development-boards-and-designs/i-mx-evaluation-and-development-boards/evaluation-kit-for-the-i-mx-8m-plus-applications-processor:8MPLUSLPD4-EVK
+  - id: nxp-imx8mn-evk
+    name: NXP i.MX 8M Nano EVK
+    vendor: NXP
+    family: imx
+    uboot: imx8mn_ddr4_evk
+    buildroot: imx8mn-ddr4-evk
+    curation: unverified
+    console:
+      interface: onboard-usb
+      note: The debug micro-USB connector carries a two-channel USB-UART bridge; the Cortex-A console is typically the second ttyUSB port like on the i.MX 8M Mini EVK. Confirm the bridge model and channel with the quick start guide.
+    power:
+      inputs: [usb-c]
+      note: USB-C power-delivery supply; switch the mains adapter.
+    flashing: [sd-card, uuu]
+    tags: [arm64, linux, evk]
+    notes:
+      - Serial download mode exposes the SoC as 1fc9:013e for UUUDriver bootstrap.
+      - U-Boot has separate defconfigs for the DDR4 (imx8mn_ddr4_evk) and LPDDR4 (imx8mn_evk) board variants.
+  - id: nxp-imx6ull-evk
+    name: NXP i.MX 6ULL 14x14 EVK
+    vendor: NXP
+    family: imx
+    uboot: mx6ull_14x14_evk
+    buildroot: imx6ullevk
+    curation: unverified
+    console:
+      interface: onboard-usb
+      note: The debug micro-USB connector on the base board carries a USB-UART bridge (one ttyUSB port). Confirm the bridge model for your board revision.
+    power:
+      inputs: [other]
+      note: 5 V supply; check the base board for the power connector (USB or jack) on your revision.
+    flashing: [sd-card, uuu]
+    tags: [arm, linux, evk]
+    notes:
+      - Serial download mode exposes the SoC as 15a2:0080 for UUUDriver bootstrap.
+  - id: nxp-imx95-evk
+    name: NXP i.MX 95 19x19 EVK
+    vendor: NXP
+    family: imx
+    uboot: imx95_19x19_evk
+    dts: freescale/imx95-19x19-evk
+    curation: unverified
+    console:
+      interface: onboard-usb
+      note: Debug USB connector with a multi-channel bridge; confirm the Cortex-A console channel with the quick start guide and pin it with ID_USB_INTERFACE_NUM.
+    power:
+      inputs: [other]
+      note: Confirm the supply (USB-C PD or DC jack) in the quick start guide; switch the mains adapter.
+    flashing: [sd-card, uuu]
+    tags: [arm64, linux, evk]
+  - id: nxp-frdm-k64f
+    name: NXP FRDM-K64F
+    vendor: NXP
+    family: kinetis
+    openocd: nxp_frdm-k64f
+    curation: docs
+    console:
+      interface: cdc-acm
+      chip: daplink
+      note: The OpenSDA circuit runs DAPLink (CMSIS-DAP, 0d28:0204) and exposes the console as /dev/ttyACM*. The console works as a USBSerialPort; Labgrid's USBDebugger does not match DAPLink at v26.0-281.
+    power:
+      inputs: [micro-usb]
+      note: Powered from the OpenSDA micro-USB connector; a YKUSH or switchable hub port can power-cycle it.
+    flashing: [openocd]
+    bootloader:
+      kind: none
+      note: Use interface/cmsis-dap.cfg via board/nxp_frdm-k64f.cfg; DAPLink also offers drag-and-drop mass-storage flashing. Because Labgrid's USBDebugger does not match DAPLink today, run OpenOCD from a FlashScriptDriver or extend the whitelist upstream.
+    tags: [cortex-m, mcu, evk]
+    docs:
+      - title: FRDM-K64F
+        url: https://www.nxp.com/design/design-center/development-boards-and-designs/general-purpose-mcus/freedom-development-platform-for-kinetis-k64-k63-and-k24-mcus:FRDM-K64F
+
+  # ---------------------------------------------------------------- TI / BeagleBoard
+  - id: beaglebone-ai-64
+    name: BeagleBone AI-64
+    vendor: BeagleBoard.org
+    family: beaglebone
+    uboot: j721e_beagleboneai64_a72
+    buildroot: beagleboneai64
+    curation: docs
+    console:
+      interface: uart-header
+      note: 3-pin JST-SH debug UART header at 3.3 V; a Raspberry Pi Debug Probe cable or a 3.3 V USB-UART adapter fits.
+    power:
+      inputs: [barrel, usb-c]
+      note: 5 V barrel jack or USB-C; switch the mains adapter with a PDU.
+    flashing: [sd-card]
+    tags: [arm64, linux, sbc]
+    docs:
+      - title: BeagleBone AI-64 documentation
+        url: https://docs.beagleboard.org/latest/boards/beaglebone/ai-64/
+  - id: ti-sk-am64b
+    name: TI SK-AM64B starter kit
+    vendor: Texas Instruments
+    family: am64
+    uboot: am64x_evm_a53
+    dts: ti/k3-am642-sk
+    buildroot: ti_am64x_sk
+    curation: unverified
+    console:
+      interface: onboard-usb
+      note: The UART micro-USB connector carries a dual USB-UART bridge; the Cortex-A console is typically the first channel. Confirm the bridge model in the user guide and pin the channel with ID_USB_INTERFACE_NUM.
+    power:
+      inputs: [usb-c]
+      note: 5 V / 3 A over USB-C.
+    flashing: [sd-card]
+    tags: [arm64, linux, evk]
+    docs:
+      - title: SK-AM64B
+        url: https://www.ti.com/tool/SK-AM64B
+  - id: ti-sk-am69
+    name: TI SK-AM69 starter kit
+    vendor: Texas Instruments
+    family: am69
+    uboot: am69_sk_a72
+    curation: unverified
+    console:
+      interface: onboard-usb
+      note: USB-UART connector with a multi-channel bridge; confirm the Cortex-A console channel in the user guide and pin it with ID_USB_INTERFACE_NUM.
+    power:
+      inputs: [other]
+      note: Confirm the DC supply in the user guide; switch the mains adapter with a PDU.
+    flashing: [sd-card]
+    tags: [arm64, linux, evk]
+    docs:
+      - title: SK-AM69
+        url: https://www.ti.com/tool/SK-AM69
+
+  # ---------------------------------------------------------------- AMD / Xilinx
+  - id: amd-zcu104
+    name: AMD/Xilinx ZCU104 evaluation kit
+    vendor: AMD (Xilinx)
+    family: zynqmp
+    uboot: xilinx_zynqmp_virt
+    dts: xilinx/zynqmp-zcu104-revC
+    buildroot: zynqmp_zcu104
+    curation: docs
+    console:
+      interface: onboard-usb
+      chip: cp210x
+      note: The USB-UART connector carries a Silicon Labs CP2108 quad bridge (four ttyUSB ports); the PS UART0 console is one of them, so test each and pin it with ID_USB_INTERFACE_NUM.
+    power:
+      inputs: [other]
+      note: 12 V supply with a 6-pin connector; switch the mains adapter with a PDU.
+    flashing: [sd-card, jtag-vendor]
+    tags: [arm64, fpga, linux, evk]
+    docs:
+      - title: ZCU104 evaluation kit
+        url: https://www.xilinx.com/products/boards-and-kits/zcu104.html
+  - id: amd-zcu106
+    name: AMD/Xilinx ZCU106 evaluation kit
+    vendor: AMD (Xilinx)
+    family: zynqmp
+    uboot: xilinx_zynqmp_virt
+    dts: xilinx/zynqmp-zcu106-revA
+    buildroot: zynqmp_zcu106
+    curation: docs
+    console:
+      interface: onboard-usb
+      chip: cp210x
+      note: The USB-UART connector carries a Silicon Labs CP2108 quad bridge (four ttyUSB ports); the PS UART0 console is one of them, so test each and pin it with ID_USB_INTERFACE_NUM.
+    power:
+      inputs: [other]
+      note: 12 V supply with a 6-pin connector; switch the mains adapter with a PDU.
+    flashing: [sd-card, jtag-vendor]
+    tags: [arm64, fpga, linux, evk]
+    docs:
+      - title: ZCU106 evaluation kit
+        url: https://www.xilinx.com/products/boards-and-kits/zcu106.html
+  - id: amd-kria-kr260
+    name: AMD Kria KR260 Robotics Starter Kit
+    vendor: AMD (Xilinx)
+    family: zynqmp
+    uboot: xilinx_zynqmp_virt
+    dts: xilinx/zynqmp-smk-k26-revA
+    buildroot: zynqmp_kria_kr260
+    curation: docs
+    console:
+      interface: onboard-usb
+      chip: ftdi
+      note: The micro-USB JTAG/UART port exposes several FTDI channels; the console is usually the second ttyUSB port. Verify and pin it with ID_USB_INTERFACE_NUM.
+    power:
+      inputs: [barrel]
+      note: 12 V barrel jack; switch the mains adapter.
+    flashing: [sd-card, jtag-vendor]
+    tags: [arm64, fpga, linux, som]
+    notes:
+      - The kernel describes the K26 SOM (zynqmp-smk-k26) plus a carrier overlay; U-Boot's xilinx_zynqmp_virt defconfig covers the whole Kria family.
+    docs:
+      - title: Kria documentation
+        url: https://xilinx.github.io/kria-apps-docs/
+  - id: amd-zc702
+    name: AMD/Xilinx ZC702 evaluation kit
+    vendor: AMD (Xilinx)
+    family: zynq
+    uboot: xilinx_zynq_virt
+    dts: xilinx/zynq-zc702
+    buildroot: zynq_zc702
+    curation: docs
+    console:
+      interface: onboard-usb
+      note: The UART mini-USB connector uses a Cypress USB-UART bridge that appears as /dev/ttyACM*.
+    power:
+      inputs: [barrel]
+      note: 12 V barrel jack with a power switch on the board; switch the mains adapter with a PDU.
+    flashing: [sd-card, jtag-vendor]
+    tags: [arm, fpga, linux, evk]
+    docs:
+      - title: ZC702 evaluation kit
+        url: https://www.xilinx.com/products/boards-and-kits/ek-z7-zc702-g.html
+  - id: digilent-zybo-z7
+    name: Digilent Zybo Z7
+    vendor: Digilent
+    family: zynq
+    uboot: xilinx_zynq_virt
+    dts: xilinx/zynq-zybo-z7
+    curation: docs
+    console:
+      interface: onboard-usb
+      chip: ftdi
+      note: The PROG/UART micro-USB connector carries an FTDI FT2232H; channel A is JTAG and channel B the UART, so the console is the second ttyUSB port (ID_USB_INTERFACE_NUM '01').
+    power:
+      inputs: [barrel, micro-usb]
+      note: 5 V barrel jack or USB power through the PROG/UART connector, selected by a jumper; USB power can be switched by a hub port, the jack needs a PDU.
+    flashing: [sd-card, jtag-vendor]
+    tags: [arm, fpga, linux, evk]
+    docs:
+      - title: Zybo Z7 reference
+        url: https://digilent.com/reference/programmable-logic/zybo-z7/start
+
+  # ---------------------------------------------------------------- Analog Devices
+  - id: adi-fmcomms2-zc706
+    name: Analog Devices AD-FMCOMMS2/3-EBZ on Xilinx ZC706
+    vendor: Analog Devices
+    family: zynq
+    uboot: xilinx_zynq_virt
+    dts: xilinx/zynq-zc706
+    buildroot: zynq_zc706
+    curation: docs
+    console:
+      interface: onboard-usb
+      chip: cp210x
+      note: The ZC706 USB-UART connector uses a Silicon Labs CP2103 bridge (a single ttyUSB port).
+    power:
+      inputs: [other]
+      note: 12 V supply with a 6-pin connector on the ZC706; switch the mains adapter with a PDU. The FMC card draws its power from the carrier.
+    flashing: [sd-card, jtag-vendor]
+    tags: [arm, fpga, linux, rf, sdr]
+    notes:
+      - ADI Kuiper Linux images boot from the SD card with a carrier-specific boot partition; the FMC card has no console or power of its own.
+    docs:
+      - title: AD-FMCOMMS2-EBZ user guide
+        url: https://wiki.analog.com/resources/eval/user-guides/ad-fmcomms2-ebz
+      - title: ZC706 evaluation kit
+        url: https://www.xilinx.com/products/boards-and-kits/ek-z7-zc706-g.html
+  - id: adi-ad9081-zcu102
+    name: Analog Devices AD9081-FMCA-EBZ on AMD ZCU102
+    vendor: Analog Devices
+    family: zynqmp
+    uboot: xilinx_zynqmp_virt
+    dts: xilinx/zynqmp-zcu102-rev1.0
+    buildroot: zynqmp_zcu102
+    curation: docs
+    console:
+      interface: onboard-usb
+      chip: ftdi
+      note: The ZCU102 USB-UART/JTAG connector exposes an FT4232 with four ttyUSB ports; the PS UART0 console is usually the first or second port, so test each and pin it with ID_USB_INTERFACE_NUM.
+    power:
+      inputs: [other]
+      note: 12 V supply with a 6-pin connector on the ZCU102; switch the mains adapter with a PDU.
+    flashing: [sd-card, jtag-vendor]
+    tags: [arm64, fpga, linux, rf]
+    notes:
+      - ADI Kuiper Linux images boot from the SD card with a carrier-specific boot partition; the FMC card has no console or power of its own.
+    docs:
+      - title: AD9081-FMCA-EBZ user guide
+        url: https://wiki.analog.com/resources/eval/user-guides/ad9081_fmca_ebz
+  - id: adi-adsp-sc598-som-ezkit
+    name: Analog Devices ADSP-SC598 SOM EZ-KIT
+    vendor: Analog Devices
+    family: sharc
+    uboot: sc598-som-ezkit-spl
+    dts: adi/sc598-som-ezkit
+    curation: docs
+    console:
+      interface: onboard-usb
+      note: USB-UART on the EZ-KIT carrier board; confirm the bridge and port in the EZ-KIT manual for your revision.
+    power:
+      inputs: [barrel]
+      note: External DC supply shipped with the kit; switch the mains adapter with a PDU.
+    flashing: [sd-card, jtag-vendor]
+    bootloader:
+      note: Upstream U-Boot keeps the default prompt; the ADI Linux Add-In build may differ, so capture it from a boot log before configuring a UBootDriver. Flashing goes through an ICE-1000 or ICE-2000 emulator with CrossCore tools, which Labgrid can run via a FlashScriptDriver.
+    tags: [arm64, dsp, linux, evk]
+    docs:
+      - title: Linux for ADSP-SC5xx
+        url: https://wiki.analog.com/resources/tools-software/linuxdsp
+  - id: adi-max32690-evkit
+    name: Analog Devices MAX32690 EVKIT
+    vendor: Analog Devices
+    family: max32
+    openocdTarget: max32690
+    curation: docs
+    console:
+      interface: cdc-acm
+      chip: daplink
+      note: The on-board DAPLink (CMSIS-DAP, 0d28:0204) provides the console as /dev/ttyACM* and the debugger on one USB cable. The console works as a USBSerialPort; Labgrid's USBDebugger does not match DAPLink at v26.0-281.
+    power:
+      inputs: [micro-usb]
+      note: Powered from the DAPLink USB connector; a YKUSH or switchable hub port can power-cycle it.
+    flashing: [openocd]
+    bootloader:
+      kind: none
+      note: Upstream OpenOCD ships target/max32690.cfg; use it with interface/cmsis-dap.cfg, or the OpenOCD bundled with the Analog Devices MSDK. Because Labgrid's USBDebugger does not match DAPLink today, run OpenOCD from a FlashScriptDriver or extend the whitelist upstream.
+    tags: [cortex-m, mcu, ble, evk]
+    docs:
+      - title: MAX32690
+        url: https://www.analog.com/en/products/max32690.html
+      - title: Analog Devices MSDK
+        url: https://github.com/analogdevicesinc/msdk
+  - id: adi-max32666-fthr
+    name: Analog Devices MAX32666FTHR
+    vendor: Analog Devices
+    family: max32
+    openocdTarget: max32666
+    curation: docs
+    console:
+      interface: cdc-acm
+      chip: daplink
+      note: The on-board MAX32625PICO-based DAPLink (CMSIS-DAP, 0d28:0204) provides the console as /dev/ttyACM* and the debugger on one micro-USB cable. The console works as a USBSerialPort; Labgrid's USBDebugger does not match DAPLink at v26.0-281.
+    power:
+      inputs: [micro-usb]
+      note: Powered from the micro-USB connector or a LiPo battery; a YKUSH or switchable hub port can power-cycle it when no battery is attached.
+    flashing: [openocd]
+    bootloader:
+      kind: none
+      note: Upstream OpenOCD ships target/max32666.cfg; use it with interface/cmsis-dap.cfg, or the OpenOCD bundled with the Analog Devices MSDK. Run it from a FlashScriptDriver until Labgrid's USBDebugger matches DAPLink.
+    tags: [cortex-m, mcu, ble, feather]
+    docs:
+      - title: MAX32666FTHR
+        url: https://www.analog.com/en/resources/evaluation-hardware-and-software/evaluation-boards-kits/max32666fthr.html
+      - title: Analog Devices MSDK
+        url: https://github.com/analogdevicesinc/msdk
+
+  # ---------------------------------------------------------------- Rockchip / Allwinner / Amlogic SBCs
+  - id: radxa-rock-5b
+    name: Radxa ROCK 5B
+    vendor: Radxa
+    family: rockchip
+    uboot: rock5b-rk3588
+    buildroot: rock5b
+    curation: docs
+    console:
+      interface: uart-header
+      note: Debug UART on the 40-pin header (pins 8 TX and 10 RX, 3.3 V) at 1500000 baud; make sure the USB-UART adapter supports 1.5 Mbaud (FT232-class adapters do).
+    power:
+      inputs: [usb-c]
+      note: USB-C power delivery (9 to 20 V); switch the mains adapter, not the USB cable.
+    flashing: [sd-card]
+    tags: [arm64, linux, sbc]
+    notes:
+      - Maskrom mode exposes the RK3588 as 2207:350b for rkdeveloptool (eMMC and SPI flashing); wrap it in a FlashScriptDriver.
+    docs:
+      - title: ROCK 5B documentation
+        url: https://docs.radxa.com/en/rock5/rock5b
+  - id: pine64-rockpro64
+    name: Pine64 ROCKPro64
+    vendor: Pine64
+    family: rockchip
+    uboot: rockpro64-rk3399
+    buildroot: rockpro64
+    curation: docs
+    console:
+      interface: uart-header
+      note: UART2 on the Pi-2 bus header (pins 6 GND, 8 TX, 10 RX; 3.3 V) at 1500000 baud; the adapter must support 1.5 Mbaud.
+    power:
+      inputs: [barrel]
+      note: 12 V barrel jack (5.5 mm / 2.1 mm); switch the mains adapter.
+    flashing: [sd-card]
+    tags: [arm64, linux, sbc]
+    notes:
+      - Maskrom mode exposes the RK3399 as 2207:330c for rkdeveloptool; wrap it in a FlashScriptDriver.
+    docs:
+      - title: ROCKPro64 wiki
+        url: https://wiki.pine64.org/wiki/ROCKPro64
+  - id: pine64-quartz64-a
+    name: Pine64 Quartz64 Model A
+    vendor: Pine64
+    family: rockchip
+    uboot: quartz64-a-rk3566
+    curation: docs
+    console:
+      interface: uart-header
+      note: UART2 on the Pi-2 bus header (3.3 V) at 1500000 baud; the adapter must support 1.5 Mbaud.
+    power:
+      inputs: [barrel]
+      note: 12 V barrel jack; switch the mains adapter.
+    flashing: [sd-card]
+    tags: [arm64, linux, sbc]
+    docs:
+      - title: Quartz64 wiki
+        url: https://wiki.pine64.org/wiki/Quartz64
+  - id: orange-pi-5
+    name: Orange Pi 5
+    vendor: Xunlong (Orange Pi)
+    family: rockchip
+    uboot: orangepi-5-rk3588s
+    curation: docs
+    console:
+      interface: uart-header
+      note: 3-pin debug UART header (TX, RX, GND; 3.3 V) at 1500000 baud; the adapter must support 1.5 Mbaud.
+    power:
+      inputs: [usb-c]
+      note: USB-C 5 V / 4 A supply (not power delivery); switch the mains adapter.
+    flashing: [sd-card]
+    tags: [arm64, linux, sbc]
+    notes:
+      - Maskrom mode exposes the RK3588S as 2207:350b for rkdeveloptool; wrap it in a FlashScriptDriver.
+    docs:
+      - title: Orange Pi
+        url: https://www.orangepi.org/
+  - id: khadas-vim3
+    name: Khadas VIM3
+    vendor: Khadas
+    family: amlogic
+    uboot: khadas-vim3
+    buildroot: khadas_vim3
+    curation: docs
+    console:
+      interface: uart-header
+      note: Linux UART on the 40-pin GPIO header (Linux_TX, Linux_RX and GND; 3.3 V) at 115200 baud.
+    power:
+      inputs: [usb-c]
+      note: USB-C 5 V (power delivery up to 20 V is accepted); a switchable hub port can power-cycle it at 5 V, otherwise switch the mains adapter.
+    flashing: [sd-card]
+    tags: [arm64, linux, sbc]
+    notes:
+      - Amlogic USB burning mode is driven with the Khadas burn tools or pyamlboot over the USB-C port; wrap them in a FlashScriptDriver.
+    docs:
+      - title: Khadas VIM3 documentation
+        url: https://docs.khadas.com/products/sbc/vim3/
+  - id: hardkernel-odroid-c4
+    name: Hardkernel ODROID-C4
+    vendor: Hardkernel
+    family: amlogic
+    uboot: odroid-c4
+    curation: docs
+    console:
+      interface: uart-header
+      note: 4-pin Molex UART header at 3.3 V (pins GND, RX, TX, VCC); Hardkernel sells a matching USB-UART kit.
+    power:
+      inputs: [barrel]
+      note: 12 V / 2 A barrel jack (5.5 mm / 2.1 mm); switch the mains adapter.
+    flashing: [sd-card]
+    tags: [arm64, linux, sbc]
+    docs:
+      - title: ODROID-C4 wiki
+        url: https://wiki.odroid.com/odroid-c4/odroid-c4
+  - id: orange-pi-zero
+    name: Orange Pi Zero
+    vendor: Xunlong (Orange Pi)
+    family: allwinner
+    uboot: orangepi_zero
+    buildroot: orangepi_zero
+    curation: unverified
+    console:
+      interface: uart-header
+      note: 3-pin debug UART header (TX, RX, GND; 3.3 V) next to the Ethernet jack at 115200 baud.
+    power:
+      inputs: [micro-usb]
+      note: 5 V over micro-USB; a YKUSH or switchable hub port can power-cycle it.
+    flashing: [sd-card]
+    tags: [arm, linux, sbc]
+
+  # ---------------------------------------------------------------- RISC-V
+  - id: starfive-visionfive-2
+    name: StarFive VisionFive 2
+    vendor: StarFive
+    family: jh7110
+    uboot: starfive_visionfive2
+    buildroot: visionfive2
+    curation: docs
+    console:
+      interface: uart-header
+      note: UART on the 40-pin header (pins 6 GND, 8 TX, 10 RX; 3.3 V) at 115200 baud.
+    power:
+      inputs: [usb-c, poe]
+      note: USB-C 5 V / 3 A, or PoE with the optional module; switch the mains adapter or the PoE port.
+    flashing: [sd-card]
+    tags: [riscv, linux, sbc]
+    notes:
+      - The boot-mode DIP switches select SD, eMMC, QSPI or UART recovery; the recovery mode loads the SPL over the same UART.
+    docs:
+      - title: VisionFive 2 quick start guide
+        url: https://doc-en.rvspace.org/VisionFive2/Quick_Start_Guide/
+  - id: sifive-hifive-unmatched
+    name: SiFive HiFive Unmatched
+    vendor: SiFive
+    family: fu740
+    uboot: sifive_unmatched
+    buildroot: hifive_unmatched
+    curation: docs
+    console:
+      interface: onboard-usb
+      chip: ftdi
+      note: The micro-USB connector carries an FT2232H; one channel is JTAG and the other the console, so the console is the second ttyUSB port (ID_USB_INTERFACE_NUM '01').
+    power:
+      inputs: [atx]
+      note: Standard ATX supply (24-pin) in a mini-ITX chassis; switch the mains with a PDU and let the board's power-on logic start it, or wire the ATX power-on pins.
+    flashing: [sd-card]
+    tags: [riscv, linux, sbc]
+    docs:
+      - title: HiFive Unmatched
+        url: https://www.sifive.com/boards/hifive-unmatched
+  - id: microchip-mpfs-icicle-kit
+    name: Microchip PolarFire SoC Icicle Kit
+    vendor: Microchip
+    family: polarfire-soc
+    uboot: microchip_mpfs_icicle
+    buildroot: microchip_mpfs_icicle
+    curation: docs
+    console:
+      interface: onboard-usb
+      chip: ftdi
+      note: The USB-UART micro-USB connector carries an FT4232H with four ttyUSB ports; the Hart Software Services use the first and Linux the second (ID_USB_INTERFACE_NUM '01').
+    power:
+      inputs: [barrel]
+      note: 12 V barrel jack; switch the mains adapter.
+    flashing: [sd-card, jtag-vendor]
+    tags: [riscv, fpga, linux, evk]
+    notes:
+      - The FPGA fabric and HSS are programmed with FlashPro or Libero through the embedded FlashPro6 on a second micro-USB connector; wrap those tools in a FlashScriptDriver.
+    docs:
+      - title: MPFS-ICICLE-KIT-ES
+        url: https://www.microchip.com/en-us/development-tool/mpfs-icicle-kit-es
+
+  # ---------------------------------------------------------------- MCU kits
+  - id: nordic-nrf52840-dk
+    name: Nordic nRF52840 DK
+    vendor: Nordic Semiconductor
+    family: nrf52
+    openocd: nordic/nrf52-dk
+    curation: docs
+    console:
+      interface: cdc-acm
+      chip: jlink
+      note: The on-board SEGGER J-Link OB (1366:1015) exposes a CDC ACM port wired to the nRF52840 UART (/dev/ttyACM*). That id is not in Labgrid's USBDebugger match list at v26.0-281, so use the console as a USBSerialPort and run OpenOCD or nrfjprog from a script.
+    power:
+      inputs: [micro-usb]
+      note: Powered from the J-Link micro-USB connector (or a coin cell); a YKUSH or switchable hub port can power-cycle it.
+    flashing: [openocd]
+    bootloader:
+      kind: none
+      note: OpenOCD uses interface/jlink.cfg with target/nordic/nrf52.cfg (board/nordic/nrf52-dk.cfg); nrfjprog and pyOCD are alternatives.
+    tags: [cortex-m, mcu, ble, evk]
+    docs:
+      - title: nRF52840 DK
+        url: https://www.nordicsemi.com/Products/Development-hardware/nRF52840-DK
+  - id: espressif-esp32-s3-devkitc-1
+    name: Espressif ESP32-S3-DevKitC-1
+    vendor: Espressif
+    family: esp32
+    openocd: esp32s3-builtin
+    curation: docs
+    console:
+      interface: onboard-usb
+      chip: cp210x
+      note: Two micro-USB connectors; the UART port has a CP2102N bridge (10c4:ea60, /dev/ttyUSB*) and the USB port is the chip's built-in USB Serial/JTAG (303a:1001, /dev/ttyACM*), which OpenOCD uses through board/esp32s3-builtin.cfg.
+    power:
+      inputs: [micro-usb]
+      note: 5 V over either micro-USB connector; a YKUSH or switchable hub port can power-cycle it.
+    flashing: [openocd]
+    bootloader:
+      kind: none
+      note: Flashing normally uses esptool over the UART port through the automatic boot-mode circuit; wrap it in a FlashScriptDriver. OpenOCD over the built-in USB JTAG is the alternative.
+    tags: [mcu, wifi, evk]
+    docs:
+      - title: ESP32-S3-DevKitC-1 user guide
+        url: https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/hw-reference/esp32s3/user-guide-devkitc-1.html

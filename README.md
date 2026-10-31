@@ -36,9 +36,12 @@ and conservative Labgrid YAML templates with explicit site-specific placeholders
 The landing page offers two paths: start with your hardware, or start with a
 goal. The hardware path leads to the bench editor:
 
-1. Name the board, optionally picking a known preset (Raspberry Pi, i.MX EVK,
-   STM32 Nucleo, ZCU102, ADI eval boards, and others). Presets supply the
-   typical console speed, power input, and bootloader prompt.
+1. Name the board, optionally picking one of the 57 known presets (Raspberry
+   Pi, i.MX EVKs, STM32 Nucleo and Discovery kits, Zynq and ZynqMP boards,
+   Rockchip and RISC-V single-board computers, ADI eval boards, and others).
+   Presets supply the typical console speed, power input, and bootloader
+   prompt, and each one says whether it was verified from documentation, in a
+   lab, or imported mechanically and not yet reviewed.
 2. Paste the output of one of these commands run on the machine the hardware
    is plugged into:
 
@@ -157,7 +160,10 @@ tests. See [docs/adding-usecases.md](docs/adding-usecases.md) and
 ## Hardware knowledge
 
 `src/data/hardware/` holds the reviewed USB id list, the network PDU backend
-table, and the board presets, each with a JSON Schema under `schemas/`. The
+table, and the board presets, each with a JSON Schema under `schemas/`. New
+board presets start from `npm run import:boards`, which extracts prompts, baud
+rates, console UARTs and debug probes from local U-Boot, Linux, Buildroot and
+OpenOCD trees (see [docs/hardware-catalog.md](docs/hardware-catalog.md)). The
 bench library in `src/bench/` loads them, parses pasted command output,
 evaluates insight rules, generates files, and maps a profile onto the wizards.
 It has no React dependency and is covered by its own tests.

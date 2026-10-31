@@ -36,7 +36,7 @@ describe('hardware catalog', () => {
   it('loads the bundled catalog', () => {
     expect(hardwareCatalog.usbDevices.length).toBeGreaterThanOrEqual(60);
     expect(hardwareCatalog.pduModels.length).toBeGreaterThanOrEqual(30);
-    expect(hardwareCatalog.boards.length).toBeGreaterThanOrEqual(15);
+    expect(hardwareCatalog.boards.length).toBeGreaterThanOrEqual(50);
     expect(loadHardwareCatalog(sources)).toEqual(hardwareCatalog);
   });
 
@@ -58,6 +58,37 @@ describe('hardware catalog', () => {
     expect(findPduModel(hardwareCatalog, 'digitalloggers_restapi')?.indexBase).toBe(0);
     expect(findBoard(hardwareCatalog, 'raspberry-pi-4')?.console.interface).toBe('uart-header');
     expect(findBoard(hardwareCatalog, 'missing')).toBeUndefined();
+  });
+
+  it('records how every board preset was verified', () => {
+    const levels = new Set(['unverified', 'docs', 'lab']);
+    for (const board of hardwareCatalog.boards) {
+      expect(levels.has(board.verification), `${board.id} verification`).toBe(true);
+      if (board.verification === 'unverified') {
+        expect(board.sources?.length ?? 0, `${board.id} needs sources`).toBeGreaterThan(0);
+      }
+      if (board.verification === 'docs') {
+        expect(board.docs?.length ?? 0, `${board.id} needs a documentation link`).toBeGreaterThan(0);
+      }
+      for (const source of board.sources ?? []) {
+        expect(source, `${board.id} source`).toMatch(/^(u-boot|linux|buildroot|openocd): \S+$/);
+      }
+    }
+    expect(hardwareCatalog.boards.some((board) => board.verification === 'unverified')).toBe(true);
+  });
+
+  it('names console chips that the usb device catalog knows', () => {
+    const chips = new Set(hardwareCatalog.usbDevices.map((device) => device.chip).filter(Boolean));
+    for (const board of hardwareCatalog.boards) {
+      if (board.console.chip) expect(chips.has(board.console.chip), `${board.id} chip ${board.console.chip}`).toBe(true);
+    }
+  });
+
+  it('carries the facts imported from the source trees', () => {
+    expect(findBoard(hardwareCatalog, 'radxa-rock-5b')?.console.speed).toBe(1500000);
+    expect(findBoard(hardwareCatalog, 'microchip-mpfs-icicle-kit')?.bootloader?.prompt).toBe('RISC-V # ');
+    expect(findBoard(hardwareCatalog, 'amd-zcu104')?.bootloader?.prompt).toBe('ZynqMP> ');
+    expect(findBoard(hardwareCatalog, 'adi-adsp-sc598-som-ezkit')?.sources).toContain('u-boot: configs/sc598-som-ezkit-spl_defconfig');
   });
 
   it('searches boards by name, vendor, family, and tags', () => {

@@ -106,7 +106,7 @@ export const sampleBenches: SampleBench[] = [
   {
     id: 'zcu102-hub-local',
     title: 'ZCU102 on a switchable USB hub',
-    description: 'FT4232 quad UART with an explicit interface number, powered through a uhubctl-capable hub port, with a USB-SD-Mux for image exchange.',
+    description: 'CP2108 quad UART with an explicit interface number, powered through a uhubctl-capable hub port, with a USB-SD-Mux for image exchange.',
     profile: {
       version: BENCH_PROFILE_VERSION,
       board: { name: 'AMD Xilinx ZCU102', presetId: 'amd-zcu102' },
@@ -118,8 +118,8 @@ export const sampleBenches: SampleBench[] = [
           id: 'dev-1',
           kind: 'usb-serial',
           label: 'Console',
-          usbId: { vendorId: '0403', productId: '6011' },
-          match: { ID_SERIAL_SHORT: 'FT4ZU7KQ', ID_USB_INTERFACE_NUM: '00' },
+          usbId: { vendorId: '10c4', productId: 'ea71' },
+          match: { ID_SERIAL_SHORT: '01A2B3C4D5E6', ID_USB_INTERFACE_NUM: '00' },
           speed: 115200,
         },
         { id: 'dev-2', kind: 'usb-hub-port', label: 'Hub port 2', match: { ID_PATH: 'pci-0000:00:14.0-usb-0:2:1.0' }, index: 2 },
