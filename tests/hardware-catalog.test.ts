@@ -169,6 +169,7 @@ models:
     name: Duplicate
     vendor: Duplicate
     family: raspberry-pi
+    verification: docs
     console:
       interface: none
       speed: 115200

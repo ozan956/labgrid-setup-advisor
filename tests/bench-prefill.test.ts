@@ -28,9 +28,9 @@ const catalog: HardwareCatalog = {
     { model: 'shelly_gen2', family: 'Shelly Gen2', indexBase: 0, hostFormat: 'url', confidence: 'source' },
   ],
   boards: [
-    { id: 'raspberry-pi-4', name: 'Raspberry Pi 4', vendor: 'Raspberry Pi', family: 'raspberry-pi', console: { interface: 'uart-header', speed: 115200 }, power: { inputs: ['usb-c'] } },
-    { id: 'imx8mm-evk', name: 'i.MX 8M Mini EVK', vendor: 'NXP', family: 'imx', console: { interface: 'onboard-usb', speed: 115200 }, power: { inputs: ['barrel'] } },
-    { id: 'mixed', name: 'Mixed', vendor: 'X', family: 'x', console: { interface: 'none', speed: 115200 }, power: { inputs: ['usb-c', 'barrel'] } },
+    { id: 'raspberry-pi-4', name: 'Raspberry Pi 4', vendor: 'Raspberry Pi', family: 'raspberry-pi', verification: 'docs', console: { interface: 'uart-header', speed: 115200 }, power: { inputs: ['usb-c'] } },
+    { id: 'imx8mm-evk', name: 'i.MX 8M Mini EVK', vendor: 'NXP', family: 'imx', verification: 'docs', console: { interface: 'onboard-usb', speed: 115200 }, power: { inputs: ['barrel'] } },
+    { id: 'mixed', name: 'Mixed', vendor: 'X', family: 'x', verification: 'docs', console: { interface: 'none', speed: 115200 }, power: { inputs: ['usb-c', 'barrel'] } },
   ],
 };
 

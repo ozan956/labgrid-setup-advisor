@@ -4,88 +4,199 @@
   "title": "Labgrid Setup Advisor board preset catalog",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "boards"],
+  "required": [
+    "schemaVersion",
+    "boards"
+  ],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": {
+      "const": 1
+    },
     "boards": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/definitions/board" }
+      "items": {
+        "$ref": "#/definitions/board"
+      }
     }
   },
   "definitions": {
-    "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$" },
-    "nonEmpty": { "type": "string", "minLength": 1 },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$"
+    },
+    "nonEmpty": {
+      "type": "string",
+      "minLength": 1
+    },
     "doc": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["title", "url"],
+      "required": [
+        "title",
+        "url"
+      ],
       "properties": {
-        "title": { "$ref": "#/definitions/nonEmpty" },
-        "url": { "type": "string", "pattern": "^https://" }
+        "title": {
+          "$ref": "#/definitions/nonEmpty"
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https://"
+        }
       }
     },
     "board": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "name", "vendor", "family", "console", "power"],
+      "required": [
+        "id",
+        "name",
+        "vendor",
+        "family",
+        "console",
+        "power",
+        "verification"
+      ],
       "properties": {
-        "id": { "$ref": "#/definitions/id" },
-        "name": { "$ref": "#/definitions/nonEmpty" },
-        "vendor": { "$ref": "#/definitions/nonEmpty" },
-        "family": { "$ref": "#/definitions/id" },
+        "id": {
+          "$ref": "#/definitions/id"
+        },
+        "name": {
+          "$ref": "#/definitions/nonEmpty"
+        },
+        "vendor": {
+          "$ref": "#/definitions/nonEmpty"
+        },
+        "family": {
+          "$ref": "#/definitions/id"
+        },
+        "verification": {
+          "enum": [
+            "unverified",
+            "docs",
+            "lab"
+          ],
+          "description": "How the facts were confirmed: 'lab' on real hardware with Labgrid, 'docs' from vendor documentation or source trees, 'unverified' when imported mechanically and not yet reviewed."
+        },
         "console": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["interface", "speed"],
+          "required": [
+            "interface",
+            "speed"
+          ],
           "properties": {
-            "interface": { "enum": ["onboard-usb", "uart-header", "cdc-acm", "none"] },
-            "speed": { "type": "integer", "minimum": 300 },
-            "chip": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
-            "note": { "$ref": "#/definitions/nonEmpty" }
+            "interface": {
+              "enum": [
+                "onboard-usb",
+                "uart-header",
+                "cdc-acm",
+                "none"
+              ]
+            },
+            "speed": {
+              "type": "integer",
+              "minimum": 300
+            },
+            "chip": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]*$"
+            },
+            "note": {
+              "$ref": "#/definitions/nonEmpty"
+            }
           }
         },
         "power": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["inputs"],
+          "required": [
+            "inputs"
+          ],
           "properties": {
             "inputs": {
               "type": "array",
               "minItems": 1,
               "uniqueItems": true,
-              "items": { "enum": ["usb-c", "micro-usb", "barrel", "poe", "atx", "other"] }
+              "items": {
+                "enum": [
+                  "usb-c",
+                  "micro-usb",
+                  "barrel",
+                  "poe",
+                  "atx",
+                  "other"
+                ]
+              }
             },
-            "note": { "$ref": "#/definitions/nonEmpty" }
+            "note": {
+              "$ref": "#/definitions/nonEmpty"
+            }
           }
         },
         "flashing": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "enum": ["sd-card", "openocd", "dfu", "fastboot", "imx-usb-loader", "uuu", "jtag-vendor"] }
+          "items": {
+            "enum": [
+              "sd-card",
+              "openocd",
+              "dfu",
+              "fastboot",
+              "imx-usb-loader",
+              "uuu",
+              "jtag-vendor"
+            ]
+          }
         },
         "bootloader": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind"],
+          "required": [
+            "kind"
+          ],
           "properties": {
-            "kind": { "enum": ["uboot", "barebox", "none"] },
-            "prompt": { "$ref": "#/definitions/nonEmpty" },
-            "note": { "$ref": "#/definitions/nonEmpty" }
+            "kind": {
+              "enum": [
+                "uboot",
+                "barebox",
+                "none"
+              ]
+            },
+            "prompt": {
+              "$ref": "#/definitions/nonEmpty"
+            },
+            "note": {
+              "$ref": "#/definitions/nonEmpty"
+            }
           }
         },
         "tags": {
           "type": "array",
           "uniqueItems": true,
-          "items": { "$ref": "#/definitions/id" }
+          "items": {
+            "$ref": "#/definitions/id"
+          }
         },
         "notes": {
           "type": "array",
-          "items": { "$ref": "#/definitions/nonEmpty" }
+          "items": {
+            "$ref": "#/definitions/nonEmpty"
+          }
         },
         "docs": {
           "type": "array",
-          "items": { "$ref": "#/definitions/doc" }
+          "items": {
+            "$ref": "#/definitions/doc"
+          }
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/nonEmpty"
+          },
+          "description": "Provenance pointers such as 'u-boot: configs/imx8mm_evk_defconfig' or 'linux: arch/arm64/boot/dts/freescale/imx8mm-evk.dts'."
         }
       }
     }

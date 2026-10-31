@@ -265,12 +265,18 @@ export interface PduModelEntry {
   confidence: 'verified' | 'source';
 }
 
+export type BoardVerification = 'unverified' | 'docs' | 'lab';
+
 export interface BoardPreset {
   id: string;
   name: string;
   vendor: string;
   /** Loose family tag: 'raspberry-pi', 'imx', 'zynq', 'stm32', 'beaglebone', 'max32', ... */
   family: string;
+  /** 'lab' confirmed on real hardware with Labgrid, 'docs' from vendor documentation or source trees, 'unverified' imported mechanically and not yet reviewed. */
+  verification: BoardVerification;
+  /** Provenance pointers such as 'u-boot: configs/imx8mm_evk_defconfig'. */
+  sources?: string[];
   console: {
     /** 'onboard-usb' when the board carries its own USB-UART, 'uart-header' when an external adapter is needed, 'cdc-acm' for MCU boards with virtual COM ports. */
     interface: 'onboard-usb' | 'uart-header' | 'cdc-acm' | 'none';

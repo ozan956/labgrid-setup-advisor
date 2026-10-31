@@ -18,12 +18,12 @@ const catalog: HardwareCatalog = {
   ],
   boards: [
     {
-      id: 'raspberry-pi-4', name: 'Raspberry Pi 4 Model B', vendor: 'Raspberry Pi', family: 'raspberry-pi',
+      id: 'raspberry-pi-4', name: 'Raspberry Pi 4 Model B', vendor: 'Raspberry Pi', family: 'raspberry-pi', verification: 'docs',
       console: { interface: 'uart-header', speed: 115200, note: 'Use a 3.3 V USB-UART adapter on GPIO 14/15 and set enable_uart=1.' },
       power: { inputs: ['usb-c'], note: 'Needs 5 V / 3 A over USB-C.' },
       bootloader: { kind: 'uboot', prompt: 'U-Boot> ', note: 'Only when you install U-Boot yourself.' },
     },
-    { id: 'stm32-nucleo-64', name: 'STM32 Nucleo-64', vendor: 'ST', family: 'stm32', console: { interface: 'cdc-acm', speed: 115200, chip: 'stlink' }, power: { inputs: ['micro-usb'] } },
+    { id: 'stm32-nucleo-64', name: 'STM32 Nucleo-64', vendor: 'ST', family: 'stm32', verification: 'docs', console: { interface: 'cdc-acm', speed: 115200, chip: 'stlink' }, power: { inputs: ['micro-usb'] } },
   ],
 };
 
