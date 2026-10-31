@@ -1,0 +1,437 @@
+# Board presets for the bench profile.
+#
+# A preset supplies typical console, power, flashing and bootloader facts so
+# the advisor can pre-fill questions and warn about common mistakes. Facts are
+# written conservatively; where boards vary by revision the note says so and
+# points to the vendor documentation. Speeds are baud rates.
+schemaVersion: 1
+boards:
+  - id: raspberry-pi-4
+    name: Raspberry Pi 4 Model B
+    vendor: Raspberry Pi
+    family: raspberry-pi
+    console:
+      interface: uart-header
+      speed: 115200
+      note: Connect a 3.3 V USB-UART adapter to GPIO 14 (TXD, pin 8) and GPIO 15 (RXD, pin 10) plus ground, and set enable_uart=1 in config.txt.
+    power:
+      inputs: [usb-c]
+      note: Needs a 5 V / 3 A USB-C supply. Switching it through a USB hub port rarely works because hub ports cannot supply that current; switch the mains adapter with a PDU or smart plug instead.
+    flashing: [sd-card]
+    bootloader:
+      kind: none
+      note: The stock firmware boots Linux directly; add U-Boot to the SD card only if your distribution uses it.
+    tags: [arm64, linux, sbc]
+    notes:
+      - The 40-pin header UART is 3.3 V; 5 V adapters damage the SoC.
+    docs:
+      - title: Raspberry Pi documentation
+        url: https://www.raspberrypi.com/documentation/
+  - id: raspberry-pi-5
+    name: Raspberry Pi 5
+    vendor: Raspberry Pi
+    family: raspberry-pi
+    console:
+      interface: uart-header
+      speed: 115200
+      note: The dedicated 3-pin JST-SH UART debug connector works with the Raspberry Pi Debug Probe or any 3.3 V USB-UART adapter; the 40-pin header UART is also available.
+    power:
+      inputs: [usb-c]
+      note: Needs a 5 V / 5 A USB-C power-delivery supply for full performance; switch the mains adapter, not the USB cable.
+    flashing: [sd-card]
+    bootloader:
+      kind: none
+    tags: [arm64, linux, sbc]
+    docs:
+      - title: Raspberry Pi documentation
+        url: https://www.raspberrypi.com/documentation/
+  - id: raspberry-pi-zero-2-w
+    name: Raspberry Pi Zero 2 W
+    vendor: Raspberry Pi
+    family: raspberry-pi
+    console:
+      interface: uart-header
+      speed: 115200
+      note: Solder or press-fit a header; use GPIO 14 and 15 with a 3.3 V adapter and set enable_uart=1.
+    power:
+      inputs: [micro-usb]
+      note: 5 V over the micro-USB PWR connector; a switchable USB hub port or YKUSH can switch it because the current draw is modest.
+    flashing: [sd-card]
+    bootloader:
+      kind: none
+    tags: [arm64, linux, sbc]
+    docs:
+      - title: Raspberry Pi documentation
+        url: https://www.raspberrypi.com/documentation/
+  - id: raspberry-pi-cm4-io
+    name: Raspberry Pi Compute Module 4 IO Board
+    vendor: Raspberry Pi
+    family: raspberry-pi
+    console:
+      interface: uart-header
+      speed: 115200
+      note: Use GPIO 14 and 15 on the 40-pin header with a 3.3 V adapter and enable_uart=1.
+    power:
+      inputs: [barrel]
+      note: 12 V barrel jack; switch it with a PDU or a DC relay.
+    flashing: [sd-card]
+    bootloader:
+      kind: none
+    tags: [arm64, linux, som]
+    notes:
+      - eMMC variants are flashed with rpiboot over the micro-USB slave port instead of an SD card; wire that into a FlashScriptDriver.
+    docs:
+      - title: Raspberry Pi documentation
+        url: https://www.raspberrypi.com/documentation/
+  - id: beaglebone-black
+    name: BeagleBone Black
+    vendor: BeagleBoard.org
+    family: beaglebone
+    console:
+      interface: uart-header
+      speed: 115200
+      note: 6-pin J1 header, 3.3 V levels; pin 1 is ground, pins 4 and 5 are RX and TX.
+    power:
+      inputs: [barrel, other]
+      note: 5 V barrel jack or the mini-USB client port; the board can be switched through a USB hub only when powered over USB.
+    flashing: [sd-card]
+    bootloader:
+      kind: uboot
+      prompt: '=> '
+    tags: [arm, linux, sbc]
+    docs:
+      - title: BeagleBone Black
+        url: https://www.beagleboard.org/boards/beaglebone-black
+  - id: beagleplay
+    name: BeaglePlay
+    vendor: BeagleBoard.org
+    family: beaglebone
+    console:
+      interface: uart-header
+      speed: 115200
+      note: 3-pin JST debug UART header; a 3.3 V adapter or Raspberry Pi Debug Probe cable fits.
+    power:
+      inputs: [usb-c]
+      note: 5 V / 3 A over USB-C.
+    flashing: [sd-card]
+    bootloader:
+      kind: uboot
+      prompt: '=> '
+    tags: [arm64, linux, sbc]
+    docs:
+      - title: BeaglePlay documentation
+        url: https://docs.beagleboard.org/latest/boards/beagleplay/
+  - id: nxp-imx8mm-evk
+    name: NXP i.MX 8M Mini EVK
+    vendor: NXP
+    family: imx
+    console:
+      interface: onboard-usb
+      speed: 115200
+      chip: ftdi
+      note: The debug USB connector carries a multi-channel FTDI bridge; the Cortex-A console is typically the first ttyUSB port. Check the quick start guide and add ID_USB_INTERFACE_NUM to the match.
+    power:
+      inputs: [usb-c]
+      note: Powered through the USB-C power connector with a power-delivery supply; switch the supply at the mains or with a PD-capable outlet.
+    flashing: [sd-card, uuu]
+    bootloader:
+      kind: uboot
+      prompt: 'u-boot=> '
+    tags: [arm64, linux, evk]
+    notes:
+      - Serial download mode (boot switches) exposes the SoC as 1fc9:0134 for UUUDriver bootstrap.
+  - id: nxp-imx93-evk
+    name: NXP i.MX 93 EVK
+    vendor: NXP
+    family: imx
+    console:
+      interface: onboard-usb
+      speed: 115200
+      chip: ftdi
+      note: Multi-channel FTDI debug bridge; the Cortex-A console is typically the first channel. Verify with the quick start guide.
+    power:
+      inputs: [usb-c]
+      note: USB-C power-delivery supply.
+    flashing: [sd-card, uuu]
+    bootloader:
+      kind: uboot
+      prompt: 'u-boot=> '
+    tags: [arm64, linux, evk]
+  - id: stm32mp157f-dk2
+    name: STM32MP157F-DK2 Discovery kit
+    vendor: STMicroelectronics
+    family: stm32mp
+    console:
+      interface: onboard-usb
+      speed: 115200
+      chip: stlink
+      note: The on-board ST-LINK/V2.1 provides the console as a CDC ACM port (/dev/ttyACM*) and a debugger on the same USB cable.
+    power:
+      inputs: [usb-c]
+      note: 5 V / 3 A over the dedicated USB-C power connector.
+    flashing: [sd-card, dfu]
+    bootloader:
+      kind: uboot
+      prompt: 'STM32MP> '
+    tags: [arm, linux, evk]
+    notes:
+      - Setting the boot switches to USB boot exposes the ROM code as DFU device 0483:df11 for STM32CubeProgrammer.
+    docs:
+      - title: STM32MP157x-DK2 getting started
+        url: https://wiki.st.com/stm32mpu/wiki/Getting_started/STM32MP1_boards/STM32MP157x-DK2
+  - id: stm32-nucleo-64
+    name: STM32 Nucleo-64 (any variant)
+    vendor: STMicroelectronics
+    family: stm32
+    console:
+      interface: cdc-acm
+      speed: 115200
+      chip: stlink
+      note: The ST-LINK/V2.1 or STLINK-V3 on the board exposes a virtual COM port wired to the target UART, so one USB cable gives console and debugger.
+    power:
+      inputs: [micro-usb, usb-c]
+      note: Powered from the ST-LINK USB connector by default; a YKUSH or switchable hub port can power-cycle it.
+    flashing: [openocd]
+    bootloader:
+      kind: none
+    tags: [cortex-m, mcu, evk]
+    notes:
+      - OpenOCD scripts live under board/st_nucleo_*.cfg; pick the one matching your MCU family.
+    docs:
+      - title: STM32 Nucleo boards
+        url: https://www.st.com/en/evaluation-tools/stm32-nucleo-boards.html
+  - id: amd-zcu102
+    name: AMD/Xilinx ZCU102 evaluation kit
+    vendor: AMD (Xilinx)
+    family: zynqmp
+    console:
+      interface: onboard-usb
+      speed: 115200
+      chip: ftdi
+      note: The USB-UART/JTAG connector exposes an FT4232 with four ttyUSB ports; the PS UART0 console is usually the first or second port, so test each and pin it with ID_USB_INTERFACE_NUM.
+    power:
+      inputs: [other]
+      note: 12 V supply with a 6-pin connector; switch it with a PDU on the mains adapter.
+    flashing: [sd-card, jtag-vendor]
+    bootloader:
+      kind: uboot
+      prompt: 'ZynqMP> '
+    tags: [arm64, fpga, linux, evk]
+    docs:
+      - title: ZCU102 evaluation kit
+        url: https://www.xilinx.com/products/boards-and-kits/ek-u1-zcu102-g.html
+  - id: digilent-zedboard
+    name: Digilent ZedBoard
+    vendor: Digilent
+    family: zynq
+    console:
+      interface: onboard-usb
+      speed: 115200
+      note: The UART micro-USB connector uses a Cypress USB-UART bridge that appears as /dev/ttyACM*.
+    power:
+      inputs: [barrel]
+      note: 12 V barrel jack with a power switch on the board; switch the mains adapter with a PDU.
+    flashing: [sd-card, jtag-vendor]
+    bootloader:
+      kind: uboot
+      prompt: 'Zynq> '
+    tags: [arm, fpga, linux, evk]
+    docs:
+      - title: ZedBoard reference
+        url: https://digilent.com/reference/programmable-logic/zedboard/start
+  - id: amd-kria-kv260
+    name: AMD Kria KV260 Vision AI Starter Kit
+    vendor: AMD (Xilinx)
+    family: zynqmp
+    console:
+      interface: onboard-usb
+      speed: 115200
+      chip: ftdi
+      note: The micro-USB JTAG/UART port exposes several FTDI channels; the console is usually the second ttyUSB port. Verify and pin it with ID_USB_INTERFACE_NUM.
+    power:
+      inputs: [barrel]
+      note: 12 V barrel jack; switch the mains adapter.
+    flashing: [sd-card, jtag-vendor]
+    bootloader:
+      kind: uboot
+      prompt: 'ZynqMP> '
+    tags: [arm64, fpga, linux, som]
+    docs:
+      - title: Kria documentation
+        url: https://xilinx.github.io/kria-apps-docs/
+  - id: ti-sk-am62
+    name: TI SK-AM62 starter kit
+    vendor: Texas Instruments
+    family: am62
+    console:
+      interface: onboard-usb
+      speed: 115200
+      chip: cp210x
+      note: The UART micro-USB connector exposes a CP2105 dual bridge; the Cortex-A console is typically the first channel (ID_USB_INTERFACE_NUM '00').
+    power:
+      inputs: [usb-c]
+      note: 5 V / 3 A over USB-C power delivery.
+    flashing: [sd-card, dfu]
+    bootloader:
+      kind: uboot
+      prompt: '=> '
+    tags: [arm64, linux, evk]
+    docs:
+      - title: SK-AM62
+        url: https://www.ti.com/tool/SK-AM62
+  - id: nvidia-jetson-orin-nano-devkit
+    name: NVIDIA Jetson Orin Nano Developer Kit
+    vendor: NVIDIA
+    family: jetson
+    console:
+      interface: uart-header
+      speed: 115200
+      note: 3.3 V UART on the 12-pin button header (TXD, RXD, GND); a USB-UART adapter is required.
+    power:
+      inputs: [barrel, usb-c]
+      note: 9 to 19 V barrel jack or USB-C power delivery; switch the mains adapter.
+    flashing: [sd-card]
+    bootloader:
+      kind: none
+      note: Boots through UEFI, not U-Boot. Flashing uses NVIDIA tools over USB recovery mode; wrap them in a FlashScriptDriver.
+    tags: [arm64, linux, sbc]
+    docs:
+      - title: Jetson Orin Nano Developer Kit getting started
+        url: https://developer.nvidia.com/embedded/learn/get-started-jetson-orin-nano-devkit
+  - id: espressif-esp32-devkitc
+    name: Espressif ESP32-DevKitC
+    vendor: Espressif
+    family: esp32
+    console:
+      interface: onboard-usb
+      speed: 115200
+      chip: cp210x
+      note: CP2102 or CP2104 bridge on the micro-USB connector; many clones use a CH340 instead. ESP-IDF logs at 115200 by default.
+    power:
+      inputs: [micro-usb]
+      note: 5 V over the same micro-USB connector, so a YKUSH or switchable hub port can power-cycle it.
+    bootloader:
+      kind: none
+      note: Flashing uses esptool over the same UART through the automatic boot-mode circuit; wrap it in a FlashScriptDriver.
+    tags: [mcu, wifi, evk]
+    docs:
+      - title: ESP32-DevKitC getting started
+        url: https://docs.espressif.com/projects/esp-idf/en/latest/esp32/hw-reference/esp32/get-started-devkitc.html
+  - id: raspberry-pi-pico
+    name: Raspberry Pi Pico
+    vendor: Raspberry Pi
+    family: rp2040
+    console:
+      interface: cdc-acm
+      speed: 115200
+      note: Console is either USB CDC from your firmware (/dev/ttyACM*) or UART0 on GPIO 0 and 1 through a 3.3 V adapter or the Debug Probe.
+    power:
+      inputs: [micro-usb]
+      note: 5 V over micro-USB; a switchable hub port or YKUSH can power-cycle it.
+    flashing: [openocd]
+    bootloader:
+      kind: none
+      note: Use a Raspberry Pi Debug Probe with interface/cmsis-dap.cfg and target/rp2040.cfg; BOOTSEL drag-and-drop is not automatable without extra hardware.
+    tags: [cortex-m, mcu]
+    docs:
+      - title: Raspberry Pi microcontroller documentation
+        url: https://www.raspberrypi.com/documentation/microcontrollers/
+  - id: adi-adrv9009-zu11eg
+    name: Analog Devices ADRV9009-ZU11EG SOM on ADRV2CRR-FMC carrier
+    vendor: Analog Devices
+    family: zynqmp
+    console:
+      interface: onboard-usb
+      speed: 115200
+      chip: ftdi
+      note: The carrier's USB-UART connector uses an FTDI bridge; check the wiki page for which port is the PS console on your carrier revision.
+    power:
+      inputs: [barrel]
+      note: 12 V supply on the carrier; switch the mains adapter with a PDU.
+    flashing: [sd-card, jtag-vendor]
+    bootloader:
+      kind: uboot
+      prompt: 'ZynqMP> '
+    tags: [arm64, fpga, linux, rf, som]
+    docs:
+      - title: ADRV9009-ZU11EG user guide
+        url: https://wiki.analog.com/resources/eval/user-guides/adrv9009-zu11eg
+  - id: adi-adrv9361-z7035
+    name: Analog Devices ADRV9361-Z7035 SOM on ADRV1CRR carrier
+    vendor: Analog Devices
+    family: zynq
+    console:
+      interface: onboard-usb
+      speed: 115200
+      chip: ftdi
+      note: USB-UART on the carrier board; the Zynq PS console appears as a single ttyUSB port.
+    power:
+      inputs: [barrel]
+      note: 12 V supply on the carrier; switch the mains adapter with a PDU.
+    flashing: [sd-card, jtag-vendor]
+    bootloader:
+      kind: uboot
+      note: ADI Kuiper images ship U-Boot; the prompt depends on the build, so capture it from a boot log before configuring a UBootDriver.
+    tags: [arm, fpga, linux, rf, som]
+    docs:
+      - title: ADRV9361-Z7035 user guide
+        url: https://wiki.analog.com/resources/eval/user-guides/adrv9361-z7035
+  - id: adi-max32655-evkit
+    name: Analog Devices MAX32655 EVKIT
+    vendor: Analog Devices
+    family: max32
+    console:
+      interface: cdc-acm
+      speed: 115200
+      chip: daplink
+      note: The on-board DAPLink (CMSIS-DAP, 0d28:0204) provides the console as /dev/ttyACM* and the debugger on one USB cable.
+    power:
+      inputs: [micro-usb]
+      note: Powered from the DAPLink USB connector; a YKUSH or switchable hub port can power-cycle it.
+    flashing: [openocd]
+    bootloader:
+      kind: none
+      note: Use the OpenOCD shipped with the Analog Devices MSDK (interface/cmsis-dap.cfg with target/max32655.cfg); upstream OpenOCD may lack the target.
+    tags: [cortex-m, mcu, ble, evk]
+    docs:
+      - title: Analog Devices MSDK
+        url: https://github.com/analogdevicesinc/msdk
+  - id: adi-adsp-sc594-ezkit
+    name: Analog Devices ADSP-SC594 EZ-KIT
+    vendor: Analog Devices
+    family: sharc
+    console:
+      interface: onboard-usb
+      speed: 115200
+      chip: ftdi
+      note: USB-UART on the EZ-KIT; confirm the port and baud rate in the EZ-KIT manual for your revision.
+    power:
+      inputs: [barrel]
+      note: External DC supply shipped with the kit; switch the mains adapter with a PDU.
+    flashing: [jtag-vendor]
+    bootloader:
+      kind: uboot
+      note: Linux for ADSP-SC5xx uses U-Boot; capture the prompt from a boot log. Flashing goes through an ICE-1000 or ICE-2000 emulator with CrossCore tools, which Labgrid can run via a FlashScriptDriver.
+    tags: [arm, dsp, linux, evk]
+    docs:
+      - title: Linux for ADSP-SC5xx
+        url: https://wiki.analog.com/resources/tools-software/linuxdsp
+  - id: adi-adalm-pluto
+    name: Analog Devices ADALM-PLUTO
+    vendor: Analog Devices
+    family: zynq
+    console:
+      interface: cdc-acm
+      speed: 115200
+      note: The firmware can expose a serial console as a CDC ACM port on the USB connector; the UART header on the PCB is the alternative for boot logs.
+    power:
+      inputs: [micro-usb]
+      note: Separate micro-USB power connector next to the data connector; a YKUSH or switchable hub port can power-cycle it.
+    flashing: [dfu]
+    bootloader:
+      kind: uboot
+      note: Firmware updates use a mass-storage drop or DFU mode; capture the U-Boot prompt from a boot log before configuring a UBootDriver.
+    tags: [arm, fpga, linux, rf, sdr]
+    docs:
+      - title: ADALM-PLUTO overview
+        url: https://wiki.analog.com/university/tools/pluto

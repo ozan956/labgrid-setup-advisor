@@ -23,11 +23,33 @@ export interface RecommendationMatch {
   matchedAnswers: string[];
 }
 
+/** User- or profile-supplied values for declared placeholder tokens, keyed by token. */
+export type PlaceholderValues = Record<string, string>;
+
 export interface GeneratedConfiguration {
   definition: ConfigurationTemplate;
   content: string;
   unresolved: ConfigurationTemplate['placeholders'];
   ready: boolean;
+  /** Placeholder values that were substituted into the content. */
+  applied: PlaceholderValues;
+}
+
+const SAFE_BARE_SCALAR = /^[A-Za-z0-9][A-Za-z0-9_./:@-]*$/;
+
+function singleQuoted(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+function doubleQuoted(value: string): string {
+  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
+/** A bare YAML scalar is only safe for plain identifiers and numbers; everything else is quoted. */
+function bareScalar(value: string): string {
+  if (/^-?\d+(\.\d+)?$/.test(value)) return value;
+  if (SAFE_BARE_SCALAR.test(value) && !/^(true|false|null|yes|no|on|off|~)$/i.test(value)) return value;
+  return singleQuoted(value);
 }
 
 export class DecisionEngine {
@@ -96,11 +118,22 @@ export class DecisionEngine {
       }));
   }
 
-  configurations(answers: Answers): GeneratedConfiguration[] {
+  configurations(answers: Answers, values: PlaceholderValues = {}): GeneratedConfiguration[] {
     if (!this.answerStatus(answers).complete) return [];
     return this.definition.configurations
       .filter((configuration) => matchesCondition(configuration.when, answers))
-      .map((configuration) => this.renderConfiguration(configuration, answers));
+      .map((configuration) => this.renderConfiguration(configuration, answers, values));
+  }
+
+  /** Every placeholder declared by the configurations selected for these answers, deduplicated by token. */
+  placeholders(answers: Answers): ConfigurationTemplate['placeholders'] {
+    const seen = new Map<string, ConfigurationTemplate['placeholders'][number]>();
+    for (const configuration of this.configurations(answers)) {
+      for (const placeholder of configuration.definition.placeholders) {
+        if (!seen.has(placeholder.token)) seen.set(placeholder.token, placeholder);
+      }
+    }
+    return [...seen.values()];
   }
 
   private describeMatches(recommendation: Recommendation, answers: Answers): string[] {
@@ -115,12 +148,37 @@ export class DecisionEngine {
     return [...new Set(descriptions)];
   }
 
-  private renderConfiguration(configuration: ConfigurationTemplate, answers: Answers): GeneratedConfiguration {
+  private renderConfiguration(
+    configuration: ConfigurationTemplate,
+    answers: Answers,
+    values: PlaceholderValues,
+  ): GeneratedConfiguration {
+    const declared = new Set(configuration.placeholders.map(({ token }) => token));
+    const applied: PlaceholderValues = {};
+    const valueFor = (token: string): string | undefined => {
+      if (!declared.has(token)) return undefined;
+      const value = values[token]?.trim();
+      if (!value) return undefined;
+      applied[token] = value;
+      return value;
+    };
+
     const content = configuration.template
       .replace(/\{\{answer:([a-z][a-z0-9-]*)\}\}/g, (_, question: string) => answers[question] ?? `<${question.toUpperCase()}>`)
-      .replace(/\{\{([A-Z][A-Z0-9_]*)\}\}/g, '<$1>');
-    const unresolved = configuration.placeholders.filter(({ required }) => required);
-    return { definition: configuration, content, unresolved, ready: unresolved.length === 0 };
+      .replace(/'\{\{([A-Z][A-Z0-9_]*)\}\}'/g, (_, token: string) => {
+        const value = valueFor(token);
+        return value === undefined ? `'<${token}>'` : singleQuoted(value);
+      })
+      .replace(/"\{\{([A-Z][A-Z0-9_]*)\}\}"/g, (_, token: string) => {
+        const value = valueFor(token);
+        return value === undefined ? `"<${token}>"` : doubleQuoted(value);
+      })
+      .replace(/\{\{([A-Z][A-Z0-9_]*)\}\}/g, (_, token: string) => {
+        const value = valueFor(token);
+        return value === undefined ? `<${token}>` : bareScalar(value);
+      });
+    const unresolved = configuration.placeholders.filter(({ token, required }) => required && applied[token] === undefined);
+    return { definition: configuration, content, unresolved, ready: unresolved.length === 0, applied };
   }
 }
 

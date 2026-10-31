@@ -36,3 +36,39 @@ describe('configuration generation', () => {
   });
 });
 
+
+describe('placeholder values', () => {
+  it('substitutes supplied values and reports the file as ready', () => {
+    const engine = new DecisionEngine(validDefinition());
+    const [generated] = engine.configurations({ 'power-source': 'external' }, { PDU_HOST: 'pdu-01.lab' });
+    expect(generated.content).toBe('host: pdu-01.lab\n');
+    expect(generated.unresolved).toEqual([]);
+    expect(generated.ready).toBe(true);
+    expect(generated.applied).toEqual({ PDU_HOST: 'pdu-01.lab' });
+    expect(parse(generated.content)).toEqual({ host: 'pdu-01.lab' });
+  });
+
+  it('keeps unquoted numbers bare and quotes anything else safely', () => {
+    const engine = new DecisionEngine(validDefinition());
+    const numeric = engine.configurations({ 'power-source': 'usb', 'usb-kind': 'ykush' }, { PORT_INDEX: '3' });
+    expect(numeric[0].content).toBe('index: 3\n# ykush\n');
+    const text = engine.configurations({ 'power-source': 'usb', 'usb-kind': 'ykush' }, { PORT_INDEX: 'a: b' });
+    expect(parse(text[0].content)).toEqual({ index: 'a: b' });
+    const quoted = engine.configurations({ 'power-source': 'external' }, { PDU_HOST: "it's" });
+    expect(parse(quoted[0].content)).toEqual({ host: "it's" });
+  });
+
+  it('ignores blank values and values for undeclared tokens', () => {
+    const engine = new DecisionEngine(validDefinition());
+    const [generated] = engine.configurations({ 'power-source': 'external' }, { PDU_HOST: '  ', OTHER: 'x' });
+    expect(generated.content).toBe('host: <PDU_HOST>\n');
+    expect(generated.ready).toBe(false);
+    expect(generated.applied).toEqual({});
+  });
+
+  it('lists the placeholders of every selected configuration once', () => {
+    const engine = new DecisionEngine(validDefinition());
+    expect(engine.placeholders({ 'power-source': 'external' }).map(({ token }) => token)).toEqual(['PDU_HOST']);
+    expect(engine.placeholders({})).toEqual([]);
+  });
+});

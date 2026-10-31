@@ -29,6 +29,36 @@ try {
       manifest.push({ id: `${definition.id}/${configuration.id}`, kind: configuration.kind, path });
     }
   }
+  // Bench files are produced by TypeScript modules, so load them through Vite's
+  // SSR module runner instead of duplicating the generator here.
+  const { createServer } = await import('vite');
+  const server = await createServer({
+    root,
+    configFile: join(root, 'vite.config.ts'),
+    appType: 'custom',
+    logLevel: 'error',
+    server: { middlewareMode: true, hmr: false, watch: null },
+  });
+  try {
+    const { generateBenchFiles } = await server.ssrLoadModule('/src/bench/generate.ts');
+    const { hardwareCatalog } = await server.ssrLoadModule('/src/bench/catalog.ts');
+    const { sampleBenches } = await server.ssrLoadModule('/src/bench/samples.ts');
+    for (const sample of sampleBenches) {
+      for (const file of generateBenchFiles(sample.profile, hardwareCatalog)) {
+        if (file.kind !== 'environment' && file.kind !== 'exporter') continue;
+        if (file.unresolved.length > 0) {
+          throw new Error(`sample bench "${sample.id}" leaves ${file.filename} unresolved: ${file.unresolved.join(', ')}`);
+        }
+        parse(file.content);
+        const path = join(directory, `bench-${sample.id}-${file.filename}`);
+        writeFileSync(path, file.content);
+        manifest.push({ id: `bench/${sample.id}/${file.filename}`, kind: file.kind, path });
+      }
+    }
+  } finally {
+    await server.close();
+  }
+
   const manifestPath = join(directory, 'manifest.json');
   writeFileSync(manifestPath, JSON.stringify(manifest));
 

@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://labgrid.org/schemas/setup-advisor/hardware-usb-devices-v1.json",
+  "title": "Labgrid Setup Advisor USB device catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "devices"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "devices": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/device" }
+    }
+  },
+  "definitions": {
+    "hex4": { "type": "string", "pattern": "^[0-9a-f]{4}$" },
+    "nonEmpty": { "type": "string", "minLength": 1 },
+    "device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vendorId", "productIds", "vendor", "product", "class"],
+      "properties": {
+        "vendorId": { "$ref": "#/definitions/hex4" },
+        "productIds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/definitions/hex4" }
+        },
+        "vendor": { "$ref": "#/definitions/nonEmpty" },
+        "product": { "$ref": "#/definitions/nonEmpty" },
+        "class": {
+          "enum": [
+            "usb-serial",
+            "usb-debugger",
+            "usb-debugger-with-serial",
+            "dfu",
+            "fastboot",
+            "ykush",
+            "usb-hub",
+            "usb-sd-mux",
+            "usb-sd-wire",
+            "imx-usb-loader",
+            "hid-relay",
+            "sispm",
+            "lxa-usb-mux",
+            "usb-storage",
+            "root-hub",
+            "unsupported"
+          ]
+        },
+        "chip": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+        "serialNumber": { "enum": ["unique", "usually-unique", "shared", "none"] },
+        "openocdInterface": { "type": "string", "pattern": "^interface/[a-z0-9_.-]+\\.cfg$" },
+        "multiInterface": { "type": "boolean" },
+        "notes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/nonEmpty" }
+        }
+      }
+    }
+  }
+}

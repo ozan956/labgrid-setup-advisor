@@ -1,0 +1,310 @@
+# Network power backends shipped with Labgrid (labgrid/driver/power/<model>.py).
+#
+# `model` is the exact value for NetworkPowerPort.model. `indexBase` is the
+# first outlet number the backend accepts; `indexMax` is given when the code
+# enforces an upper bound. `hostFormat` is 'host' when the backend expects a
+# plain hostname or IP (it adds its own port), and 'url' when `host` must be a
+# full http(s) URL, optionally with user:password@ credentials.
+# `confidence` is 'verified' when the upstream source names tested hardware
+# and 'source' when the family was inferred from the code.
+schemaVersion: 1
+models:
+  - model: apc
+    family: APC switched rack PDU (PowerNet MIB over SNMP v1)
+    indexBase: 1
+    indexMax: 8
+    hostFormat: host
+    requirements:
+      - net-snmp command-line tools (snmpget, snmpset) on the host running the driver
+    notes:
+      - Uses the SNMP community 'private' hardcoded in the backend.
+      - Outlet range 1 to 8 is enforced by the backend; larger units need a backend change.
+    confidence: source
+  - model: digipower
+    family: Digipower 8-outlet web PDU
+    indexBase: 1
+    indexMax: 8
+    hostFormat: host
+    requirements:
+      - HTTP access on port 80
+    notes:
+      - Logs in with the credentials snmp / 1234 hardcoded in the backend.
+    confidence: source
+  - model: digitalloggers_http
+    family: Digital Loggers Web Power Switch (legacy HTTP API)
+    indexBase: 1
+    hostFormat: url
+    requirements:
+      - HTTP access; put credentials in the URL if the switch requires them
+    notes:
+      - host is the base URL, for example http://admin:1234@192.168.0.100
+      - Written against the Web Power Switch 7 HTTP API.
+    confidence: verified
+  - model: digitalloggers_restapi
+    family: Digital Loggers PDU with REST API (Pro and newer)
+    indexBase: 0
+    hostFormat: url
+    requirements:
+      - HTTP digest authentication credentials in the URL
+    notes:
+      - Outlets are 0-based in the REST API, so the first outlet is index 0.
+      - TLS certificate verification is disabled by the backend.
+    confidence: verified
+  - model: eaton
+    family: Eaton ePDU (SNMP)
+    indexBase: 1
+    indexMax: 16
+    hostFormat: host
+    requirements:
+      - pip install 'labgrid[snmp]'
+    notes:
+      - Uses the SNMP community 'public' for both reading and switching.
+    confidence: source
+  - model: eg_pms2_network
+    family: Energenie EG-PMS2-LAN power strip
+    indexBase: 1
+    indexMax: 4
+    hostFormat: host
+    requirements:
+      - HTTP access on port 80
+    notes:
+      - Logs in with the default password '1' hardcoded in the backend; the EG-PMS2-WLAN is mentioned as compatible but untested.
+    confidence: verified
+  - model: eth008
+    family: Robot Electronics ETH008 relay board
+    indexBase: 1
+    indexMax: 8
+    hostFormat: host
+    requirements:
+      - HTTP access on port 80
+    notes:
+      - Switches relays, not mains outlets; wire the relay into the board's power path yourself.
+    confidence: source
+  - model: gude
+    family: Gude Expert Power Control (8-port, classic HTML interface)
+    indexBase: 1
+    indexMax: 8
+    hostFormat: host
+    requirements:
+      - HTTP access on port 80 without session authentication
+    notes:
+      - Uses switch.html; newer firmware may need the gude24, gude8031, gude8225 or gude8316 backend instead.
+    confidence: source
+  - model: gude24
+    family: Gude Expert Power Control 8080 and other 24-port models
+    indexBase: 1
+    indexMax: 24
+    hostFormat: host
+    requirements:
+      - HTTP access on port 80 without session authentication
+    notes:
+      - Tested upstream with the Expert Power Control 8080.
+    confidence: verified
+  - model: gude8031
+    family: Gude Expert Power Control 8031 and 87-1210-18
+    indexBase: 1
+    indexMax: 20
+    hostFormat: host
+    requirements:
+      - HTTP access on port 80 in 'Basic Compatible' mode without session authentication
+    notes:
+      - Tested upstream with the Expert Power Control 8031 and 87-1210-18.
+    confidence: verified
+  - model: gude8225
+    family: Gude Expert Power Control 8225
+    indexBase: 1
+    indexMax: 12
+    hostFormat: host
+    requirements:
+      - HTTP access on port 80
+    notes:
+      - Tested upstream with the Expert Power Control 8225-1 firmware v1.0.6.
+    confidence: verified
+  - model: gude8316
+    family: Gude Expert Power Control 8316
+    indexBase: 1
+    indexMax: 8
+    hostFormat: host
+    requirements:
+      - HTTP access on port 80
+    notes:
+      - Tested upstream with firmware v1.2.0; contains a workaround for a firmware status bug.
+    confidence: verified
+  - model: mfi_mpower
+    family: Ubiquiti mFi mPower PRO
+    indexBase: 1
+    hostFormat: url
+    requirements:
+      - HTTP access; credentials in the URL (defaults ubnt / ubnt)
+    notes:
+      - host is a URL such as http://username:password@192.168.1.10/
+    confidence: source
+  - model: netio
+    family: NETIO 4 series (HTTP tgi API)
+    indexBase: 1
+    indexMax: 4
+    hostFormat: host
+    requirements:
+      - HTTP access on port 80
+    notes:
+      - Logs in with admin / admin hardcoded in the backend; change the backend or the device if you use other credentials.
+    confidence: source
+  - model: netio_kshell
+    family: NETIO 4C (telnet K-shell on port 1234)
+    indexBase: 1
+    indexMax: 4
+    hostFormat: host
+    requirements:
+      - A telnet client on the host running the driver (used through pexpect)
+    notes:
+      - Logs in with admin / admin hardcoded in the backend; the docstring says it should work with all NETIO 4 models.
+    confidence: verified
+  - model: pe6216
+    family: ATEN PE6216 PDU
+    indexBase: 1
+    indexMax: 16
+    hostFormat: host
+    requirements:
+      - HTTP access on port 80
+    notes:
+      - Uses the credentials administrator / password hardcoded in the backend.
+    confidence: verified
+  - model: poe_mib
+    family: PoE switch with the standard Power Ethernet MIB (SNMP)
+    indexBase: 1
+    hostFormat: host
+    requirements:
+      - pip install 'labgrid[snmp]'
+    notes:
+      - Switches PoE on a switch port; index is the port number in the MIB table.
+      - Tested upstream with a Cisco CBS350; uses the SNMP community 'private'.
+    confidence: verified
+  - model: poe_netgear_plus
+    family: Netgear Plus managed switch (PoE per port)
+    indexBase: 0
+    hostFormat: url
+    requirements:
+      - pip install 'labgrid[netgear]'
+    notes:
+      - host is http://[username:]password@hostname/ and the scheme must be http; port index is 0-based.
+    confidence: source
+  - model: raritan
+    family: Raritan PX PDU (PDU2 MIB over SNMP)
+    indexBase: 1
+    hostFormat: host
+    requirements:
+      - pip install 'labgrid[snmp]'
+    notes:
+      - Uses the SNMP communities 'private' for switching and 'public' for reading.
+    confidence: source
+  - model: rest
+    family: Generic REST relay (PUT 1/0 to a URL template)
+    indexBase: 0
+    hostFormat: url
+    requirements:
+      - An HTTP endpoint accepting PUT with body 1 or 0 and GET returning 1 or 0
+    notes:
+      - host is a template containing {index}, for example http://192.168.0.42/relay/{index}/value
+    confidence: source
+  - model: rpm1521
+    family: Minuteman RPM1521 power controller
+    indexBase: 1
+    hostFormat: url
+    requirements:
+      - HTTP basic authentication credentials in the URL
+    notes:
+      - host is a URL such as http://admin:secret@192.168.1.10
+    confidence: source
+  - model: sentry
+    family: Server Technology Sentry PDU (Sentry3 MIB over SNMP v1)
+    indexBase: 1
+    indexMax: 48
+    hostFormat: host
+    requirements:
+      - net-snmp command-line tools (snmpget, snmpset) on the host running the driver
+    notes:
+      - Tested upstream with the CW-24VDD and 4805-XLS-16; uses the SNMP community 'private'.
+    confidence: verified
+  - model: shelly_gen1
+    family: Shelly Gen1 relays (Shelly 1, 1PM, 2.5, Plug S)
+    indexBase: 0
+    hostFormat: url
+    requirements:
+      - HTTP access to the Shelly's local web API
+    notes:
+      - host is a URL without trailing slash, for example http://192.168.0.42; relay index is 0-based.
+    confidence: source
+  - model: shelly_gen2
+    family: Shelly Gen2 and newer relays (Plus and Pro series, RPC API)
+    indexBase: 0
+    hostFormat: url
+    requirements:
+      - HTTP access to the Shelly's local RPC API
+    notes:
+      - host is a URL such as http://192.168.0.42; switch id is 0-based.
+    confidence: source
+  - model: siglent
+    family: Siglent SPD3303X-E bench power supply (VXI-11)
+    indexBase: 1
+    indexMax: 2
+    hostFormat: host
+    requirements:
+      - pip install 'labgrid[vxi11]'
+    notes:
+      - Switches the supply's CH1 or CH2 output; the backend emits a deprecation warning upstream.
+    confidence: source
+  - model: simplerest
+    family: Generic GET-URL relay (index and value in the URL)
+    indexBase: 0
+    hostFormat: url
+    requirements:
+      - An HTTP endpoint that switches on GET and returns 1 or 0
+    notes:
+      - host is a template containing {value} and optionally {index}, for example http://172.17.180.53:9999/relay/{index}/{value}
+    confidence: source
+  - model: tapo
+    family: TP-Link Tapo smart plugs and strips (P100, P300)
+    indexBase: 0
+    hostFormat: host
+    requirements:
+      - pip install 'labgrid[kasa]'
+      - KASA_USERNAME and KASA_PASSWORD environment variables with TP-Link cloud credentials
+    notes:
+      - Socket index is 0-based; single-socket plugs ignore it.
+    confidence: verified
+  - model: tinycontrol
+    family: Tinycontrol IP Power Socket 6G10A v2
+    indexBase: 1
+    hostFormat: url
+    requirements:
+      - HTTP access to the device's CGI interface
+    notes:
+      - host is a URL including the port, for example http://172.17.180.53:9999/; the upstream example uses index 3 for output 3.
+    confidence: verified
+  - model: tinycontrol_tcpdu
+    family: Tinycontrol tcPDU
+    indexBase: 1
+    hostFormat: url
+    requirements:
+      - HTTP access to the device's REST API
+    notes:
+      - host is a URL such as http://172.17.180.53; the upstream example uses index 3 for output 3.
+    confidence: verified
+  - model: tplink
+    family: TP-Link Kasa smart strips (KP303 and other kasa IOT strips)
+    indexBase: 0
+    hostFormat: host
+    requirements:
+      - pip install 'labgrid[kasa]'
+    notes:
+      - Tested upstream with the KP303; socket index is 0-based and no authentication is used.
+    confidence: verified
+  - model: ubus
+    family: OpenWrt switch with PoE control over ubus JSON-RPC
+    indexBase: 1
+    hostFormat: url
+    requirements:
+      - Unauthenticated ubus ACL for the poe.info and poe.manage calls
+    notes:
+      - host is the ubus endpoint URL, for example http://192.168.1.1/ubus; index selects the lan<N> port.
+    confidence: source

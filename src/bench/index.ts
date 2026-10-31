@@ -1,0 +1,17 @@
+export * from './types';
+export * from './profile';
+export { hardwareCatalog, loadHardwareCatalog, findUsbDevice, findPduModel, findBoard, searchBoards, HardwareCatalogError } from './catalog';
+export { parseLsusb } from './parsers/lsusb';
+export { parseUdevadm } from './parsers/udevadm';
+export { parseLabgridSuggest } from './parsers/suggest';
+export { detectInputFormat, parseHardwareText } from './parsers/index';
+export { suggestDevices } from './detect';
+export type { DetectedCandidate, DetectionResult, InputFormat } from './detect';
+export { analyzeProfile } from './insights';
+export { prefillForUseCase, prefillAll, applyPrefill } from './prefill';
+export { generateBenchFiles } from './generate';
+export { buildChecklist } from './checklist';
+export { createZip } from './zip';
+export { STORAGE_KEY, validateProfile, saveProfile, loadProfile, clearProfile, encodeShareHash, decodeShareHash, summarizeProfile } from './storage';
+export { sampleBenches } from './samples';
+export type { SampleBench } from './samples';
