@@ -26,12 +26,22 @@ npm run build
 When Labgrid is installed, also run:
 
 ```bash
-npm run validate:labgrid
+PYTHON=/path/to/venv/bin/python LABGRID_REQUIRED=1 npm run validate:labgrid
 ```
 
-Add tests with behavior changes. Engine logic belongs under `src/engine`, UI
-behavior under `src/components`, and Labgrid-specific facts in YAML. A new use
-case should not need a React conditional.
+This renders every use-case template and every sample bench and checks them
+with the real Labgrid package.
+
+Add tests with behavior changes. Engine logic belongs under `src/engine`,
+bench logic under `src/bench`, UI behavior under `src/components`, and
+Labgrid-specific facts in YAML. Device facts (USB ids, PDU backends, board
+presets) go into `src/data/hardware/`; see
+[docs/hardware-catalog.md](docs/hardware-catalog.md). A new use case should
+not need a React conditional.
+
+Configuration templates should reuse the shared placeholder tokens
+(`PLACE_NAME`, `EXPORT_GROUP`, `SERIAL_NUMBER`, `BAUD_RATE`, `PDU_HOST`, ...)
+listed in `src/bench/prefill.ts`, so a bench profile can fill them in.
 
 ## Commits
 

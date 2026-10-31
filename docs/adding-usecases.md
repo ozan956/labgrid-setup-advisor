@@ -23,7 +23,9 @@ have one.
 
 Keep each question necessary for selecting a materially different result.
 Prefer a few explicit predicates over a clever rule graph. Put hardware facts,
-explanations, component names, and links in YAML rather than JSX.
+explanations, component names, and links in YAML rather than JSX. Facts about
+specific devices (USB ids, PDU backends, board presets) belong in
+`src/data/hardware/`; see [hardware-catalog.md](hardware-catalog.md).
 
 ## 3. Write conservative templates
 
@@ -31,6 +33,10 @@ explanations, component names, and links in YAML rather than JSX.
 - Preserve real Labgrid nesting and class names.
 - Leave serials, udev matches, hosts, outlet indices, place names, credentials,
   and other site data as declared placeholders.
+- Reuse the shared placeholder tokens (`PLACE_NAME`, `EXPORT_GROUP`,
+  `SERIAL_NUMBER`, `BAUD_RATE`, `PDU_HOST`, `PDU_OUTLET_INDEX`,
+  `UDEV_ID_PATH`, `SHELL_PROMPT`, ...) so a bench profile can fill them. The
+  full list is in `src/bench/prefill.ts`; see [bench.md](bench.md).
 - Do not emit a template when a required backend or electrical path is unknown.
 - Explain whether a sample switches USB power, a DC path, or a complete outlet.
 
