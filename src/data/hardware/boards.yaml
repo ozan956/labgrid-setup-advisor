@@ -331,7 +331,7 @@ boards:
     flashing: [openocd]
     bootloader:
       kind: none
-      note: Use a Raspberry Pi Debug Probe with interface/cmsis-dap.cfg and target/rp2040.cfg; BOOTSEL drag-and-drop is not automatable without extra hardware.
+      note: Use a Raspberry Pi Debug Probe with interface/cmsis-dap.cfg and target/rp2040.cfg; BOOTSEL drag-and-drop is not automatable without extra hardware. Labgrid's USBDebugger does not match the Debug Probe id (2e8a:000c) at v26.0-281, so drive OpenOCD from a script or extend the whitelist upstream.
     tags: [cortex-m, mcu]
     docs:
       - title: Raspberry Pi microcontroller documentation
@@ -384,14 +384,14 @@ boards:
       interface: cdc-acm
       speed: 115200
       chip: daplink
-      note: The on-board DAPLink (CMSIS-DAP, 0d28:0204) provides the console as /dev/ttyACM* and the debugger on one USB cable.
+      note: The on-board DAPLink (CMSIS-DAP, 0d28:0204) provides the console as /dev/ttyACM* and the debugger on one USB cable. The console works as a USBSerialPort; Labgrid's USBDebugger does not match DAPLink at v26.0-281.
     power:
       inputs: [micro-usb]
       note: Powered from the DAPLink USB connector; a YKUSH or switchable hub port can power-cycle it.
     flashing: [openocd]
     bootloader:
       kind: none
-      note: Use the OpenOCD shipped with the Analog Devices MSDK (interface/cmsis-dap.cfg with target/max32655.cfg); upstream OpenOCD may lack the target.
+      note: Use the OpenOCD shipped with the Analog Devices MSDK (interface/cmsis-dap.cfg with target/max32655.cfg); upstream OpenOCD may lack the target. Because Labgrid's USBDebugger does not match DAPLink today, run that OpenOCD from a FlashScriptDriver or extend the whitelist upstream.
     tags: [cortex-m, mcu, ble, evk]
     docs:
       - title: Analog Devices MSDK

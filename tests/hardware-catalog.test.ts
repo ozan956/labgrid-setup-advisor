@@ -74,6 +74,29 @@ describe('hardware catalog', () => {
     expect(hardwareCatalog.pduModels.map(({ model }) => model).sort()).toEqual([...upstreamPowerBackends].sort());
   });
 
+  it('only classes ids from the upstream USBDebugger whitelist as debuggers', () => {
+    // Mirror of USBDebugger.filter_match in labgrid/resource/udev.py at v26.0-281.
+    const range = (start: number, end: number): string[] =>
+      Array.from({ length: end - start + 1 }, (_, offset) => (start + offset).toString(16).padStart(4, '0'));
+    const whitelist = new Set<string>([
+      ...['6010', '6014'].map((id) => `0403:${id}`),
+      ...['3748', '374b', '374e', '374f', '3754'].map((id) => `0483:${id}`),
+      '04b4:f155',
+      ...['0003', '002b', '0004', '002a'].map((id) => `15ba:${id}`),
+      ...[...range(0x0101, 0x0105), '0107', '0108', ...range(0x1001, 0x102f), ...range(0x1050, 0x106f)].map((id) => `1366:${id}`),
+      ...['0617', '2500', '0283', '2503', '2504', '2507', '2508', '250a', '250c', '250d'].map((id) => `064b:${id}`),
+    ]);
+    const debuggers = hardwareCatalog.usbDevices.filter((device) => device.class === 'usb-debugger' || device.class === 'usb-debugger-with-serial');
+    expect(debuggers.length).toBeGreaterThan(3);
+    for (const device of debuggers) {
+      for (const productId of device.productIds) expect(whitelist.has(`${device.vendorId}:${productId}`), `${device.vendorId}:${productId} ${device.product}`).toBe(true);
+    }
+    const blasters = hardwareCatalog.usbDevices.filter((device) => device.class === 'altera-usb-blaster');
+    expect(blasters.flatMap((device) => device.productIds.map((id) => `${device.vendorId}:${id}`)).sort()).toEqual(['09fb:6010', '09fb:6810']);
+    expect(findUsbDevice(hardwareCatalog, { vendorId: '0d28', productId: '0204' })?.class).toBe('usb-serial');
+    expect(findUsbDevice(hardwareCatalog, { vendorId: '0403', productId: 'cff8' })?.class).toBe('unsupported');
+  });
+
   it('keeps openocd interface scripts well formed', () => {
     const debuggers = hardwareCatalog.usbDevices.filter((device) => device.openocdInterface !== undefined);
     expect(debuggers.length).toBeGreaterThan(0);

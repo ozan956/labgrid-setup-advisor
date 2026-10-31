@@ -105,14 +105,16 @@ function resourceSpec(device: BenchDevice, collector: Collector): ResourceSpec |
     case 'imx-usb-loader':
       return { ...base, params: { match: matchParams(device.match, collector, 'ID_PATH') } };
     case 'usb-sd-mux':
-      return { ...base, params: { match: matchParams(device.match, collector, '@ID_PATH') } };
+      // USBSDMuxDevice matches the mux's own USB device, and labgrid-suggest prints a direct ID_PATH for it.
+      return { ...base, params: { match: matchParams(device.match, collector, 'ID_PATH') } };
     case 'fastboot':
+      // udev reports ids in lower case and AndroidUSBFastboot compares them as strings.
       return {
         ...base,
         params: {
           match: matchParams(device.match, collector, 'ID_PATH'),
-          usb_vendor_id: text(device.usbId?.vendorId, 'USB_VENDOR_ID', collector),
-          usb_product_id: text(device.usbId?.productId, 'USB_PRODUCT_ID', collector),
+          usb_vendor_id: text(device.usbId?.vendorId?.toLowerCase(), 'USB_VENDOR_ID', collector),
+          usb_product_id: text(device.usbId?.productId?.toLowerCase(), 'USB_PRODUCT_ID', collector),
         },
       };
     case 'network-service':
@@ -205,35 +207,56 @@ function planTarget(profile: BenchProfile, collector: Collector): Plan {
   }
   const needsNames = resources.some((spec) => spec.named);
 
-  const consoleDrivers: string[] = [];
-  const powerDrivers: string[] = [];
+  // A manual power entry next to a real controller would give the target two
+  // PowerProtocol drivers, which Labgrid rejects as ambiguous. The controller wins.
+  const controlledPower = devices.some((device) => POWER_KINDS.has(device.kind) && device.kind !== 'manual-power' && resourceClassOf(device));
+
+  const consoleDrivers: DriverSpec[] = [];
+  const powerDrivers: DriverSpec[] = [];
   for (const device of devices) {
     if (device.kind === 'manual-power') {
+      if (controlledPower) continue;
       const name = profile.board.name.trim() || profile.names.place.trim() || 'board-01';
-      drivers.push({ cls: 'ManualPowerDriver', params: { name }, name });
-      powerDrivers.push(name);
+      const manual: DriverSpec = { cls: 'ManualPowerDriver', params: { name }, name };
+      drivers.push(manual);
+      powerDrivers.push(manual);
       continue;
     }
     const spec = resources.find((candidate) => candidate.device.id === device.id);
     const driver = driverFor(device);
     if (!spec || !driver) continue;
-    const name = spec.named ? `${spec.name}-driver` : undefined;
-    drivers.push({
+    const driverSpec: DriverSpec = {
       cls: driver.cls,
       params: driver.params,
-      name,
+      name: spec.named ? `${spec.name}-driver` : undefined,
       bindings: spec.named ? { [driver.attribute]: spec.name } : undefined,
-    });
-    if (CONSOLE_KINDS.has(device.kind)) consoleDrivers.push(name ?? driver.cls);
-    if (POWER_KINDS.has(device.kind)) powerDrivers.push(name ?? driver.cls);
+    };
+    drivers.push(driverSpec);
+    if (CONSOLE_KINDS.has(device.kind)) consoleDrivers.push(driverSpec);
+    if (POWER_KINDS.has(device.kind)) powerDrivers.push(driverSpec);
   }
 
   // Protocol consumers need explicit bindings only when several suppliers exist.
-  const consoleBinding: Record<string, string> = consoleDrivers.length > 1 ? { console: consoleDrivers[0] } : {};
-  const powerBinding: Record<string, string> = powerDrivers.length > 1 ? { power: powerDrivers[0] } : {};
+  // A binding always names a driver instance, never a class, so the referenced
+  // driver gets an explicit name if it has none yet.
+  const usedNames = new Set(drivers.map((driver) => driver.name).filter((name): name is string => name !== undefined));
+  const bindingName = (driver: DriverSpec): string => {
+    if (!driver.name) {
+      let candidate = slugify(driver.cls);
+      let suffix = 2;
+      while (usedNames.has(candidate)) candidate = `${slugify(driver.cls)}-${suffix++}`;
+      usedNames.add(candidate);
+      driver.name = candidate;
+    }
+    return driver.name;
+  };
+  const consoleBinding: Record<string, string> = consoleDrivers.length > 1 ? { console: bindingName(consoleDrivers[0]) } : {};
+  const powerBinding: Record<string, string> = powerDrivers.length > 1 ? { power: bindingName(powerDrivers[0]) } : {};
   const hasPower = powerDrivers.length > 0;
+  // ShellDriver, bootloader drivers and strategies all talk over the console.
+  const hasConsole = consoleDrivers.length > 0;
 
-  if (profile.login) {
+  if (profile.login && hasConsole) {
     drivers.push({
       cls: 'ShellDriver',
       name: 'shell',
@@ -245,7 +268,7 @@ function planTarget(profile: BenchProfile, collector: Collector): Plan {
       bindings: { ...consoleBinding },
     });
   }
-  if (profile.bootloader) {
+  if (profile.bootloader && hasConsole) {
     const uboot = profile.bootloader.kind === 'uboot';
     drivers.push({
       cls: uboot ? 'UBootDriver' : 'BareboxDriver',
@@ -254,7 +277,7 @@ function planTarget(profile: BenchProfile, collector: Collector): Plan {
       bindings: { ...consoleBinding },
     });
   }
-  if (profile.login && hasPower) {
+  if (profile.login && hasPower && hasConsole) {
     const uboot = profile.bootloader?.kind === 'uboot';
     const cls = profile.bootloader ? (uboot ? 'UBootStrategy' : 'BareboxStrategy') : 'ShellStrategy';
     drivers.push({ cls, name: 'strategy', params: {}, bindings: { ...consoleBinding, ...powerBinding } });

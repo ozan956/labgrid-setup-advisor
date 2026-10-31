@@ -1,3 +1,4 @@
+import { findUsbDevice } from './catalog';
 import type { LsusbEntry } from './parsers/lsusb';
 import type { SuggestEntry } from './parsers/suggest';
 import { udev, type UdevadmDevice } from './parsers/udevadm';
@@ -50,18 +51,9 @@ const UNGENERATED_CLASSES: Partial<Record<UsbDeviceClass, string>> = {
   sispm: 'SiSPMPowerPort',
   'lxa-usb-mux': 'LXAUSBMux',
   'usb-sd-wire': 'USBSDWireDevice',
-  'usb-storage': 'USBMassStorage',
 };
 
 const FILL_MATCH_HINT = 'Run `udevadm info /dev/ttyUSB0` (use the real device node) or `labgrid-suggest` and paste the output to fill in the match values.';
-
-function lookupUsb(catalog: HardwareCatalog, id: UsbId): UsbDeviceEntry | undefined {
-  const vendorId = id.vendorId.toLowerCase();
-  const productId = id.productId.toLowerCase();
-  return catalog.usbDevices.find(
-    (entry) => entry.vendorId.toLowerCase() === vendorId && entry.productIds.some((candidate) => candidate.toLowerCase() === productId),
-  );
-}
 
 function productText(entry: UsbDeviceEntry | undefined, fallback: string): string {
   if (!entry) return fallback;
@@ -143,9 +135,9 @@ class Collector {
 /* ------------------------------------------------------------------ */
 
 function fromLsusb(entry: LsusbEntry, catalog: HardwareCatalog, out: Collector): void {
-  const usbId: UsbId = { vendorId: entry.vendorId, productId: entry.productId };
-  const catalogEntry = lookupUsb(catalog, usbId);
-  const summary = `${entry.vendorId}:${entry.productId} ${entry.description}`.trim();
+  const usbId: UsbId = { vendorId: entry.vendorId.toLowerCase(), productId: entry.productId.toLowerCase() };
+  const catalogEntry = findUsbDevice(catalog, usbId);
+  const summary = `${usbId.vendorId}:${usbId.productId} ${entry.description}`.trim();
   const product = productText(catalogEntry, entry.description || `USB device ${entry.vendorId}:${entry.productId}`);
   const note = entry.description || product;
   const uniqueKey = `lsusb:${entry.bus}:${entry.device}`;
@@ -182,7 +174,7 @@ function fromLsusb(entry: LsusbEntry, catalog: HardwareCatalog, out: Collector):
     );
   };
 
-  const addDebugger = (): void => {
+  const addDebugger = (resourceClass?: 'AlteraUSBBlaster'): void => {
     out.add(
       {
         device: {
@@ -193,10 +185,13 @@ function fromLsusb(entry: LsusbEntry, catalog: HardwareCatalog, out: Collector):
           usbId,
           match: { ID_SERIAL_SHORT: '' },
           interfaceConfig: catalogEntry.openocdInterface,
+          ...(resourceClass ? { resourceClass } : {}),
         },
         confidence: 'medium',
         source,
-        explanation: `${product} is in Labgrid's USBDebugger list, so OpenOCDDriver can flash and debug through it. ${FILL_MATCH_HINT}`,
+        explanation: resourceClass
+          ? `${product} is matched by Labgrid's AlteraUSBBlaster resource, and OpenOCDDriver binds to it. ${FILL_MATCH_HINT}`
+          : `${product} is in Labgrid's USBDebugger list, so OpenOCDDriver can flash and debug through it. ${FILL_MATCH_HINT}`,
         catalogEntry,
       },
       `${uniqueKey}:debugger`,
@@ -211,6 +206,9 @@ function fromLsusb(entry: LsusbEntry, catalog: HardwareCatalog, out: Collector):
       return;
     case 'usb-debugger':
       addDebugger();
+      return;
+    case 'altera-usb-blaster':
+      addDebugger('AlteraUSBBlaster');
       return;
     case 'usb-debugger-with-serial':
       addDebugger();
@@ -262,10 +260,22 @@ function fromLsusb(entry: LsusbEntry, catalog: HardwareCatalog, out: Collector):
     case 'usb-sd-mux':
       out.add(
         {
-          device: { id: PENDING, kind: 'usb-sd-mux', label: 'SD mux', note, match: { '@ID_PATH': '' } },
+          device: { id: PENDING, kind: 'usb-sd-mux', label: 'SD mux', note, match: { ID_PATH: '' } },
           confidence: 'medium',
           source,
-          explanation: `${product} lets Labgrid switch an SD card between the host and the board. ${FILL_MATCH_HINT}`,
+          explanation: `${product} lets Labgrid switch an SD card between the host and the board. Use the ID_PATH that labgrid-suggest prints for it. ${FILL_MATCH_HINT}`,
+          catalogEntry,
+        },
+        uniqueKey,
+      );
+      return;
+    case 'usb-storage':
+      out.add(
+        {
+          device: { id: PENDING, kind: 'usb-storage', label: 'Storage', note, match: { ID_PATH: '' } },
+          confidence: 'medium',
+          source,
+          explanation: `${product} is a USB mass storage device for USBStorageDriver. Use the ID_PATH of its block device (\`udevadm info /dev/sdX\`). ${FILL_MATCH_HINT}`,
           catalogEntry,
         },
         uniqueKey,
@@ -338,9 +348,10 @@ function fromUdevadm(device: UdevadmDevice, catalog: HardwareCatalog, out: Colle
     out.skip(summary, 'No USB vendor and product id in this record, so it cannot be matched to a Labgrid resource.');
     return;
   }
-  const usbId: UsbId = { vendorId, productId: modelId };
-  const catalogEntry = lookupUsb(catalog, usbId);
+  const usbId: UsbId = { vendorId: vendorId.toLowerCase(), productId: modelId.toLowerCase() };
+  const catalogEntry = findUsbDevice(catalog, usbId);
   const subsystem = udev.subsystem(device);
+  const devType = udev.devType(device);
   const serial = udev.serialShort(device);
   const interfaceNum = udev.usbInterfaceNum(device);
   const idPath = udev.idPath(device);
@@ -388,6 +399,21 @@ function fromUdevadm(device: UdevadmDevice, catalog: HardwareCatalog, out: Colle
     return;
   }
 
+  if (subsystem === 'block' && devType === 'disk' && catalogEntry?.class !== 'usb-sd-mux') {
+    if (!idPath) {
+      out.skip(summary, 'The block device record has no ID_PATH, so USBMassStorage cannot be matched.');
+      return;
+    }
+    out.add({
+      device: { id: PENDING, kind: 'usb-storage', label: 'Storage', note, match: { ID_PATH: idPath } },
+      confidence: 'high',
+      source,
+      explanation: `${deviceNode ?? 'This disk'} is ${product}. USBMassStorage matches the block device itself, so its full ID_PATH is used.`,
+      catalogEntry,
+    });
+    return;
+  }
+
   if (!catalogEntry) {
     out.add({
       device: { id: PENDING, kind: 'unsupported-usb', label: product, note, usbId },
@@ -404,18 +430,34 @@ function fromUdevadm(device: UdevadmDevice, catalog: HardwareCatalog, out: Colle
     case 'usb-serial':
       out.skip(summary, `${product} is a serial adapter, but this record is for the USB device rather than its tty node. Run \`udevadm info /dev/ttyUSB0\` on the tty device instead.`);
       return;
+    case 'usb-storage':
+      out.skip(summary, `${product} is a storage device, but this record is not its block device. Run \`udevadm info /dev/sdX\` on the disk instead.`);
+      return;
     case 'usb-debugger':
-    case 'usb-debugger-with-serial': {
+    case 'usb-debugger-with-serial':
+    case 'altera-usb-blaster': {
       const match = serialMatch() ?? pathMatch();
       if (!match) {
         out.skip(summary, 'The record has neither ID_SERIAL_SHORT nor ID_PATH.');
         return;
       }
+      const altera = catalogEntry.class === 'altera-usb-blaster';
       out.add({
-        device: { id: PENDING, kind: 'usb-debugger', label: 'Debug probe', note, usbId, match, interfaceConfig: catalogEntry.openocdInterface },
+        device: {
+          id: PENDING,
+          kind: 'usb-debugger',
+          label: 'Debug probe',
+          note,
+          usbId,
+          match,
+          interfaceConfig: catalogEntry.openocdInterface,
+          ...(altera ? { resourceClass: 'AlteraUSBBlaster' as const } : {}),
+        },
         confidence: 'high',
         source,
-        explanation: `${product} is in Labgrid's USBDebugger list, so OpenOCDDriver can use it.${catalogEntry.class === 'usb-debugger-with-serial' ? ' Its virtual COM port is a separate tty device; paste its udevadm record to add the console.' : ''}`,
+        explanation: altera
+          ? `${product} is matched by Labgrid's AlteraUSBBlaster resource, and OpenOCDDriver binds to it.`
+          : `${product} is in Labgrid's USBDebugger list, so OpenOCDDriver can use it.${catalogEntry.class === 'usb-debugger-with-serial' ? ' Its virtual COM port is a separate tty device; paste its udevadm record to add the console.' : ''}`,
         catalogEntry,
       });
       return;
@@ -452,10 +494,10 @@ function fromUdevadm(device: UdevadmDevice, catalog: HardwareCatalog, out: Colle
         return;
       }
       out.add({
-        device: { id: PENDING, kind: 'usb-sd-mux', label: 'SD mux', note, match: { '@ID_PATH': usbDevicePath(idPath) } },
+        device: { id: PENDING, kind: 'usb-sd-mux', label: 'SD mux', note, match: { ID_PATH: usbDevicePath(idPath) } },
         confidence: 'high',
         source,
-        explanation: `${product} lets Labgrid switch the SD card between host and board.`,
+        explanation: `${product} lets Labgrid switch the SD card between host and board. USBSDMuxDevice matches the mux's own USB device, so its ID_PATH is used without the SCSI and interface suffixes.`,
         catalogEntry,
       });
       return;
@@ -548,7 +590,7 @@ function fromSuggest(entry: SuggestEntry, out: Collector): void {
         device: {
           id: PENDING,
           kind: 'usb-serial',
-          label: consoleLabel(match.ID_USB_INTERFACE_NUM ?? match['@ID_USB_INTERFACE_NUM'], entry.portNumber !== undefined),
+          label: consoleLabel(match.ID_USB_INTERFACE_NUM ?? match['@ID_USB_INTERFACE_NUM'], false),
           note,
           match,
           speed: DEFAULT_SPEED,
@@ -583,6 +625,22 @@ function fromSuggest(entry: SuggestEntry, out: Collector): void {
         explanation: 'A debug probe from Labgrid\'s USBDebugger list; set the OpenOCD interface and board scripts.',
       });
       return;
+    case 'AlteraUSBBlaster':
+      out.add({
+        device: {
+          id: PENDING,
+          kind: 'usb-debugger',
+          label: 'Debug probe',
+          note,
+          match: pickMatch(entry.matches, true)!,
+          resourceClass: 'AlteraUSBBlaster',
+          interfaceConfig: 'interface/altera-usb-blaster.cfg',
+        },
+        confidence: 'high',
+        source,
+        explanation: 'An Altera/Intel USB-Blaster; Labgrid exposes it as AlteraUSBBlaster and OpenOCDDriver binds to it (USB-Blaster II uses interface/altera-usb-blaster2.cfg).',
+      });
+      return;
     case 'DFUDevice':
       out.add({
         device: { id: PENDING, kind: 'dfu', label: 'DFU bootloader', note, match: pickMatch(entry.matches, true)! },
@@ -597,7 +655,7 @@ function fromSuggest(entry: SuggestEntry, out: Collector): void {
           id: PENDING,
           kind: 'fastboot',
           label: 'Fastboot',
-          note: `${note ? `${note}. ` : ''}Vendor and product id must be set; Labgrid's default 1d6b:0104 is almost never right.`,
+          note: `${note ? `${note}. ` : ''}Set the vendor and product id from lsusb; Labgrid's default 1d6b:0104 is the Linux composite gadget id used by U-Boot and barebox, and other devices differ.`,
           match: pickMatch(entry.matches, true)!,
           usbId: FASTBOOT_DEFAULT,
         },

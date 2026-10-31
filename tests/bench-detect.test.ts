@@ -16,6 +16,8 @@ const catalog: HardwareCatalog = {
     { vendorId: '1d6b', productIds: ['0002'], vendor: 'Linux Foundation', product: '2.0 root hub', class: 'root-hub' },
     { vendorId: '0424', productIds: ['4041'], vendor: 'Linux Automation', product: 'USB-SD-Mux', class: 'usb-sd-mux' },
     { vendorId: '16c0', productIds: ['05df'], vendor: 'dcttech', product: 'USBRelay2', class: 'hid-relay' },
+    { vendorId: '09fb', productIds: ['6010'], vendor: 'Altera', product: 'USB-Blaster', class: 'altera-usb-blaster', openocdInterface: 'interface/altera-usb-blaster.cfg' },
+    { vendorId: '0781', productIds: ['5583'], vendor: 'SanDisk', product: 'Ultra Fit', class: 'usb-storage' },
   ],
 };
 
@@ -136,9 +138,28 @@ Bus 002 Device 006: ID 16c0:05df Van Ooijen Technische Informatica HID device`;
     expect(hub.device.kind === 'usb-hub-port' && hub.device.match).toEqual({ ID_PATH: '' });
     expect(hub.explanation).toMatch(/uhubctl/);
     expect(hub.explanation).toMatch(/:1\.0/);
-    expect(detected.candidates[2].device.kind === 'usb-sd-mux' && detected.candidates[2].device.match).toEqual({ '@ID_PATH': '' });
+    expect(detected.candidates[2].device.kind === 'usb-sd-mux' && detected.candidates[2].device.match).toEqual({ ID_PATH: '' });
     expect(detected.skipped).toHaveLength(1);
     expect(detected.skipped[0].reason).toMatch(/HIDRelay/);
+  });
+
+  it('maps USB-Blasters to AlteraUSBBlaster and storage devices to USBMassStorage', () => {
+    const text = `Bus 001 Device 009: ID 09fb:6010 Altera Blaster
+Bus 001 Device 010: ID 0781:5583 SanDisk Corp. Ultra Fit`;
+    const detected = suggestDevices({ lsusb: parseLsusb(text) }, catalog, []);
+    expect(detected.candidates.map((candidate) => candidate.device.kind)).toEqual(['usb-debugger', 'usb-storage']);
+    const blaster = detected.candidates[0].device;
+    expect(blaster.kind === 'usb-debugger' && blaster.resourceClass).toBe('AlteraUSBBlaster');
+    expect(blaster.kind === 'usb-debugger' && blaster.interfaceConfig).toBe('interface/altera-usb-blaster.cfg');
+    expect(detected.candidates[0].explanation).toMatch(/AlteraUSBBlaster/);
+    expect(detected.candidates[1].device.kind === 'usb-storage' && detected.candidates[1].device.match).toEqual({ ID_PATH: '' });
+    expect(detected.skipped).toEqual([]);
+  });
+
+  it('lower-cases ids before looking them up', () => {
+    const detected = suggestDevices({ lsusb: [{ bus: '001', device: '002', vendorId: '10C4', productId: 'EA60', description: 'CP210x' }] }, catalog, []);
+    expect(detected.candidates).toHaveLength(1);
+    expect(detected.candidates[0].device.kind === 'usb-serial' && detected.candidates[0].device.usbId).toEqual({ vendorId: '10c4', productId: 'ea60' });
   });
 
   it('keeps two identical adapters as separate candidates', () => {
@@ -190,7 +211,26 @@ E: ID_PATH=pci-0000:00:14.0-usb-0:2.3:1.0-scsi-0:0:0:0`;
     const detected = suggestDevices({ udevadm: parseUdevadm(text) }, catalog, []);
     expect(detected.candidates.map((candidate) => candidate.device.kind)).toEqual(['usb-hub-port', 'usb-sd-mux']);
     expect(detected.candidates[0].device.kind === 'usb-hub-port' && detected.candidates[0].device.match).toEqual({ ID_PATH: 'pci-0000:00:14.0-usb-0:2:1.0' });
-    expect(detected.candidates[1].device.kind === 'usb-sd-mux' && detected.candidates[1].device.match).toEqual({ '@ID_PATH': 'pci-0000:00:14.0-usb-0:2.3' });
+    expect(detected.candidates[1].device.kind === 'usb-sd-mux' && detected.candidates[1].device.match).toEqual({ ID_PATH: 'pci-0000:00:14.0-usb-0:2.3' });
+  });
+
+  it('turns an unknown USB disk into a USBMassStorage match on the block device path', () => {
+    const text = `P: /devices/pci0000:00/0000:00:14.0/usb1/1-4/1-4:1.0/host7/target7:0:0/7:0:0:0/block/sdc
+N: sdc
+E: DEVNAME=/dev/sdc
+E: SUBSYSTEM=block
+E: DEVTYPE=disk
+E: ID_VENDOR_ID=0951
+E: ID_MODEL_ID=1666
+E: ID_VENDOR=Kingston
+E: ID_MODEL=DataTraveler_3.0
+E: ID_PATH=pci-0000:00:14.0-usb-0:4:1.0-scsi-0:0:0:0`;
+    const detected = suggestDevices({ udevadm: parseUdevadm(text) }, catalog, []);
+    expect(detected.candidates).toHaveLength(1);
+    const [candidate] = detected.candidates;
+    expect(candidate.device.kind).toBe('usb-storage');
+    expect(candidate.device.kind === 'usb-storage' && candidate.device.match).toEqual({ ID_PATH: 'pci-0000:00:14.0-usb-0:4:1.0-scsi-0:0:0:0' });
+    expect(candidate.confidence).toBe('high');
   });
 
   it('skips records without usb ids and usb-device records of serial adapters', () => {
@@ -293,6 +333,34 @@ describe('suggestDevices from labgrid-suggest', () => {
     expect(fastboot.kind === 'fastboot' && fastboot.usbId).toEqual({ vendorId: '1d6b', productId: '0104' });
     expect(fastboot.note).toMatch(/1d6b:0104/);
     expect(result.skipped).toEqual([]);
+  });
+
+  it('maps AlteraUSBBlaster blocks and ignores port_number when labelling consoles', () => {
+    const text = `=== added device ===
+  AlteraUSBBlaster for /devices/g
+  === suggested matches ===
+  AlteraUSBBlaster:
+    match:
+      ID_PATH: pci-0000:00:14.0-usb-0:7
+  ---
+=== added device ===
+  USBSerialPort for /devices/h/ttyUSB3/tty/ttyUSB3
+  === device properties ===
+  device node: /dev/ttyUSB3
+  port_number: 2
+  === suggested matches ===
+  USBSerialPort:
+    match:
+      '@port_number': 2
+      ID_PATH: pci-0000:00:14.0-usb-0:8:1.0
+  ---
+`;
+    const result = suggestDevices({ suggest: parseLabgridSuggest(text) }, catalog, []);
+    expect(result.candidates.map((candidate) => candidate.device.kind)).toEqual(['usb-serial', 'usb-debugger']);
+    const console = result.candidates[0].device;
+    expect(console.label).toBe('Console');
+    const blaster = result.candidates[1].device;
+    expect(blaster.kind === 'usb-debugger' && blaster.resourceClass).toBe('AlteraUSBBlaster');
   });
 });
 

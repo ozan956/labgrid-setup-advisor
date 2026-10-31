@@ -268,4 +268,4 @@ documentation:
     url: https://labgrid.readthedocs.io/en/latest/configuration.html#shelldriver
   - id: reservations
     title: Places, tags, and reservations
-    url: https://labgrid.readthedocs.io/en/latest/usage.html#places-and-reservations
+    url: https://labgrid.readthedocs.io/en/latest/usage.html

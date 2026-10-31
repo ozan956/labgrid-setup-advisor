@@ -222,7 +222,7 @@ documentation:
     url: https://labgrid.readthedocs.io/en/latest/getting_started.html
   - id: reservations
     title: Places, tags, and reservations
-    url: https://labgrid.readthedocs.io/en/latest/usage.html#places-and-reservations
+    url: https://labgrid.readthedocs.io/en/latest/usage.html
   - id: pytest
     title: Labgrid pytest integration
     url: https://labgrid.readthedocs.io/en/latest/usage.html

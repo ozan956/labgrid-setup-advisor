@@ -271,7 +271,7 @@ models:
       - KASA_USERNAME and KASA_PASSWORD environment variables with TP-Link cloud credentials
     notes:
       - Socket index is 0-based; single-socket plugs ignore it.
-    confidence: verified
+    confidence: source
   - model: tinycontrol
     family: Tinycontrol IP Power Socket 6G10A v2
     indexBase: 1

@@ -261,7 +261,7 @@ documentation:
     url: https://labgrid.readthedocs.io/en/latest/man/client.html
   - id: reservations
     title: Places, tags, and reservations
-    url: https://labgrid.readthedocs.io/en/latest/usage.html#places-and-reservations
+    url: https://labgrid.readthedocs.io/en/latest/usage.html
   - id: proxy
     title: Labgrid proxy mechanism
     url: https://labgrid.readthedocs.io/en/latest/overview.html#proxy-mechanism

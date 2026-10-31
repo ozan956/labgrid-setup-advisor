@@ -155,10 +155,12 @@ export class DecisionEngine {
   ): GeneratedConfiguration {
     const declared = new Set(configuration.placeholders.map(({ token }) => token));
     const applied: PlaceholderValues = {};
+    // Whitespace is significant in prompt expressions such as ' login: ', so only
+    // blank values are treated as missing and the original text is substituted.
     const valueFor = (token: string): string | undefined => {
       if (!declared.has(token)) return undefined;
-      const value = values[token]?.trim();
-      if (!value) return undefined;
+      const value = values[token];
+      if (value === undefined || value.trim().length === 0) return undefined;
       applied[token] = value;
       return value;
     };

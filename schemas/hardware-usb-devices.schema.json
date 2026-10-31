@@ -35,6 +35,7 @@
             "usb-serial",
             "usb-debugger",
             "usb-debugger-with-serial",
+            "altera-usb-blaster",
             "dfu",
             "fastboot",
             "ykush",

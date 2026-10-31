@@ -179,7 +179,8 @@ describe('generateBenchFiles', () => {
     expect(notes.kind).toBe('notes');
     expect(notes.content).toContain('| Place | zcu102-01 |');
     expect(notes.content).toContain('labgrid-client -p zcu102-01 add-match labhost/rack-3-zcu102/*');
-    expect(notes.content).toContain('add-named-match labhost/rack-3-zcu102/USBSerialPort/console-a console-a');
+    expect(notes.content).not.toContain('add-named-match');
+    expect(notes.content).toContain('come from the keys in exporter.yaml');
     expect(notes.content).toContain('`exporter.yaml` (exporter-host)');
     expect(notes.content).toContain('- Console A: USB serial console (115200 baud)');
   });
@@ -270,5 +271,79 @@ describe('exporter comment safety', () => {
         }
       }
     }
+  });
+});
+
+describe('review fixes', () => {
+  type Env = { targets: { main: { resources: unknown; drivers: Array<Record<string, Record<string, unknown>>> | Record<string, Record<string, unknown>> } } };
+
+  it('binds the strategy to a named power driver when two PDU outlets exist', () => {
+    const profile = localProfile();
+    profile.devices = [
+      { id: 'dev-1', kind: 'usb-serial', label: 'Console', match: { ID_SERIAL_SHORT: 'A50285BI' }, speed: 115200 },
+      { id: 'dev-2', kind: 'network-pdu', label: 'Board outlet', model: 'netio', host: 'pdu.lab', index: 1 },
+      { id: 'dev-3', kind: 'network-pdu', label: 'Peripheral outlet', model: 'netio', host: 'pdu.lab', index: 2 },
+    ];
+    const env = parse(byName(generateBenchFiles(profile, fixtureCatalog), 'environment.yaml').content) as Env;
+    const drivers = env.targets.main.drivers as Array<Record<string, Record<string, unknown>>>;
+    expect(Array.isArray(drivers)).toBe(true);
+    const names = drivers.map((entry) => Object.values(entry)[0].name).filter((name): name is string => typeof name === 'string');
+    expect(new Set(names).size).toBe(names.length);
+    const strategy = drivers.find((entry) => 'UBootStrategy' in entry)?.UBootStrategy;
+    expect(strategy?.bindings).toEqual({ power: 'board-outlet-driver' });
+    expect(names).toContain('board-outlet-driver');
+    // Every binding value refers to a driver instance name that exists in the list.
+    for (const entry of drivers) {
+      const bindings = (Object.values(entry)[0].bindings ?? {}) as Record<string, string>;
+      for (const [attribute, target] of Object.entries(bindings)) {
+        if (attribute === 'power' || attribute === 'console') expect(names).toContain(target);
+      }
+    }
+    const shell = drivers.find((entry) => 'ShellDriver' in entry)?.ShellDriver;
+    expect(shell?.bindings).toBeUndefined();
+    // The single console needs no name; only ambiguous suppliers and their consumers are named.
+    expect(drivers.find((entry) => 'SerialDriver' in entry)?.SerialDriver.name).toBeUndefined();
+  });
+
+  it('drops ManualPowerDriver when a real power controller exists', () => {
+    const profile = localProfile();
+    profile.devices.push({ id: 'dev-3', kind: 'manual-power', label: 'Hand switch' });
+    const env = parse(byName(generateBenchFiles(profile, fixtureCatalog), 'environment.yaml').content) as Env;
+    expect(Object.keys(env.targets.main.drivers)).toEqual(['SerialDriver', 'NetworkPowerDriver', 'ShellDriver', 'UBootDriver', 'UBootStrategy']);
+  });
+
+  it('skips login, bootloader and strategy drivers when no console exists', () => {
+    const profile = localProfile();
+    profile.devices = [{ id: 'dev-2', kind: 'network-pdu', label: 'PDU', model: 'netio', host: 'pdu.lab', index: 3 }];
+    const env = parse(byName(generateBenchFiles(profile, fixtureCatalog), 'environment.yaml').content) as Env;
+    expect(Object.keys(env.targets.main.drivers)).toEqual(['NetworkPowerDriver']);
+  });
+
+  it('emits AlteraUSBBlaster for a USB-Blaster debugger and lower-cases fastboot ids', () => {
+    const profile = localProfile();
+    profile.devices = [
+      { id: 'dev-1', kind: 'usb-debugger', label: 'USB-Blaster', match: { ID_PATH: 'pci-0000:00:14.0-usb-0:4' }, resourceClass: 'AlteraUSBBlaster', interfaceConfig: 'interface/altera-usb-blaster.cfg' },
+      { id: 'dev-2', kind: 'fastboot', label: 'Fastboot', match: { ID_PATH: 'pci-0000:00:14.0-usb-0:5' }, usbId: { vendorId: '18D1', productId: '4EE0' } },
+    ];
+    delete profile.login;
+    delete profile.bootloader;
+    const env = parse(byName(generateBenchFiles(profile, fixtureCatalog), 'environment.yaml').content) as {
+      targets: { main: { resources: Record<string, Record<string, unknown>>; drivers: Record<string, unknown> } };
+    };
+    expect(Object.keys(env.targets.main.resources)).toEqual(['AlteraUSBBlaster', 'AndroidUSBFastboot']);
+    expect(env.targets.main.resources.AndroidUSBFastboot.usb_vendor_id).toBe('18d1');
+    expect(env.targets.main.resources.AndroidUSBFastboot.usb_product_id).toBe('4ee0');
+    expect(Object.keys(env.targets.main.drivers)).toEqual(['OpenOCDDriver', 'AndroidFastbootDriver']);
+  });
+
+  it('uses a direct ID_PATH placeholder for an empty USB-SD-Mux match', () => {
+    const profile = localProfile();
+    profile.devices = [{ id: 'dev-1', kind: 'usb-sd-mux', label: 'SD mux', match: {} }];
+    delete profile.login;
+    delete profile.bootloader;
+    const env = byName(generateBenchFiles(profile, fixtureCatalog), 'environment.yaml');
+    const parsed = parse(env.content) as { targets: { main: { resources: { USBSDMuxDevice: { match: Record<string, string> } } } } };
+    expect(parsed.targets.main.resources.USBSDMuxDevice.match).toEqual({ ID_PATH: '<ID_PATH>' });
+    expect(env.unresolved).toEqual(['ID_PATH']);
   });
 });

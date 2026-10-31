@@ -1,4 +1,5 @@
-import { DEFAULT_COORDINATOR, NAME_PATTERN, deviceRole, devicesWithRole, hasRequiredMatch } from './profile';
+import { findBoard as findBoardEntry, findPduModel, findUsbDevice } from './catalog';
+import { DEFAULT_COORDINATOR, NAME_PATTERN, devicesWithRole, hasRequiredMatch } from './profile';
 import type {
   BenchDevice,
   BenchProfile,
@@ -26,7 +27,7 @@ const DOCS = {
   gettingStarted: { title: 'Getting started', url: 'https://labgrid.readthedocs.io/en/latest/getting_started.html' },
   exporter: { title: 'labgrid-exporter', url: 'https://labgrid.readthedocs.io/en/latest/man/exporter.html' },
   suggest: { title: 'labgrid-suggest', url: 'https://labgrid.readthedocs.io/en/latest/man/suggest.html' },
-  reservations: { title: 'Places and reservations', url: 'https://labgrid.readthedocs.io/en/latest/usage.html#places-and-reservations' },
+  reservations: { title: 'Places and reservations', url: 'https://labgrid.readthedocs.io/en/latest/usage.html' },
   uhubctl: { title: 'uhubctl', url: 'https://github.com/mvp/uhubctl' },
   strategies: { title: 'Strategies', url: 'https://labgrid.readthedocs.io/en/latest/configuration.html#strategies' },
 };
@@ -34,21 +35,15 @@ const DOCS = {
 const SEVERITY_ORDER: Record<InsightSeverity, number> = { critical: 0, warning: 1, info: 2, success: 3 };
 
 function findUsb(catalog: HardwareCatalog, id: UsbId | undefined): UsbDeviceEntry | undefined {
-  if (!id) return undefined;
-  const vendorId = id.vendorId.toLowerCase();
-  const productId = id.productId.toLowerCase();
-  return catalog.usbDevices.find(
-    (entry) => entry.vendorId.toLowerCase() === vendorId && entry.productIds.some((product) => product.toLowerCase() === productId),
-  );
+  return id ? findUsbDevice(catalog, id) : undefined;
 }
 
 function findPdu(catalog: HardwareCatalog, model: string): PduModelEntry | undefined {
-  return catalog.pduModels.find((entry) => entry.model === model);
+  return findPduModel(catalog, model);
 }
 
 function findBoard(catalog: HardwareCatalog, id: string | undefined): BoardPreset | undefined {
-  if (!id) return undefined;
-  return catalog.boards.find((board) => board.id === id);
+  return id ? findBoardEntry(catalog, id) : undefined;
 }
 
 function sameUsbId(a: UsbId | undefined, b: UsbId | undefined): boolean {
@@ -82,7 +77,6 @@ export function analyzeProfile(profile: BenchProfile, catalog: HardwareCatalog):
   const insights: Insight[] = [];
   const consoles = devicesWithRole(profile, 'console');
   const power = devicesWithRole(profile, 'power');
-  const debug = devicesWithRole(profile, 'debug');
   const board = findBoard(catalog, profile.board.presetId);
 
   if (!NAME_PATTERN.test(profile.names.place) || !NAME_PATTERN.test(profile.names.group)) {
@@ -170,7 +164,21 @@ export function analyzeProfile(profile: BenchProfile, catalog: HardwareCatalog):
     });
   }
 
-  if ((profile.login || profile.bootloader) && consoles.length === 0) {
+  const manualPower = power.filter((device) => device.kind === 'manual-power');
+  const controlledPower = power.filter((device) => device.kind !== 'manual-power');
+  if (manualPower.length > 0 && controlledPower.length > 0) {
+    insights.push({
+      id: 'redundant-manual-power',
+      severity: 'warning',
+      title: 'Manual power is ignored next to a real power controller',
+      detail: `${pluralDevices(controlledPower)} already provides PowerProtocol. A ManualPowerDriver beside it would make the target ambiguous, so the generated files leave out ${pluralDevices(manualPower)}. Remove the manual entry if you no longer need it.`,
+      devices: manualPower.map(({ id }) => id),
+      docs: [DOCS.configuration],
+    });
+  }
+
+  const loginWithoutConsole = (profile.login !== undefined || profile.bootloader !== undefined) && consoles.length === 0;
+  if (loginWithoutConsole) {
     insights.push({
       id: 'login-without-console',
       severity: 'warning',
@@ -279,7 +287,7 @@ export function analyzeProfile(profile: BenchProfile, catalog: HardwareCatalog):
   }
 
   const hasCritical = insights.some((insight) => insight.severity === 'critical');
-  if (!hasCritical && (consoles.length > 0 || power.length > 0)) {
+  if (!hasCritical && !loginWithoutConsole && (consoles.length > 0 || power.length > 0)) {
     insights.push({
       id: 'ready',
       severity: 'success',

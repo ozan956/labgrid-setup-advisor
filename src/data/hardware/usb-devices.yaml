@@ -17,7 +17,7 @@ devices:
     serialNumber: usually-unique
     notes:
       - Genuine FT232R adapters carry a unique serial number, so ID_SERIAL_SHORT is a stable match.
-      - Clone adapters often share one serial number or report none; fall back to '@ID_PATH' in that case.
+      - Clone adapters often share one serial number or report none; fall back to ID_PATH (the tty device's own USB port path, as labgrid-suggest prints it) in that case.
   - vendorId: '0403'
     productIds: ['6015']
     vendor: FTDI
@@ -67,7 +67,7 @@ devices:
     chip: cp210x
     serialNumber: shared
     notes:
-      - Many CP2102 modules ship with the serial number '0001', so two adapters on one host collide. Prefer the '@ID_PATH' match unless `udevadm info` shows a customized serial.
+      - Many CP2102 modules ship with the serial number '0001', so two adapters on one host collide. Prefer the ID_PATH match unless `udevadm info` shows a customized serial.
   - vendorId: '10c4'
     productIds: ['ea70']
     vendor: Silicon Labs
@@ -98,7 +98,7 @@ devices:
     chip: ch340
     serialNumber: none
     notes:
-      - CH340 adapters have no USB serial number, so ID_SERIAL_SHORT does not exist. Match with '@ID_PATH' and keep the adapter in the same USB port.
+      - CH340 adapters have no USB serial number, so ID_SERIAL_SHORT does not exist. Match with ID_PATH and keep the adapter in the same USB port.
   - vendorId: '1a86'
     productIds: ['55d4']
     vendor: QinHeng Electronics (WCH)
@@ -108,7 +108,7 @@ devices:
     serialNumber: none
     notes:
       - Id per the Linux ch341 driver; not in the local usb.ids database.
-      - Usually no unique serial number; match with '@ID_PATH'.
+      - Usually no unique serial number; match with ID_PATH.
   - vendorId: '1a86'
     productIds: ['55d3']
     vendor: QinHeng Electronics (WCH)
@@ -118,7 +118,7 @@ devices:
     serialNumber: none
     notes:
       - Id per the Linux ch341/ch343 drivers; not in the local usb.ids database.
-      - Usually no unique serial number; match with '@ID_PATH'.
+      - Usually no unique serial number; match with ID_PATH.
 
   # ---------------------------------------------------------------- Prolific
   - vendorId: '067b'
@@ -129,7 +129,7 @@ devices:
     chip: pl2303
     serialNumber: none
     notes:
-      - PL2303 adapters normally have no serial number; match with '@ID_PATH'.
+      - PL2303 adapters normally have no serial number; match with ID_PATH.
       - Counterfeit PL2303 chips are rejected by Windows drivers but work on Linux.
   - vendorId: '067b'
     productIds: ['23a3']
@@ -140,7 +140,7 @@ devices:
     serialNumber: none
     notes:
       - usb.ids lists this id as an ATEN serial bridge; Linux handles it with the pl2303 driver.
-      - Normally no serial number; match with '@ID_PATH'.
+      - Normally no serial number; match with ID_PATH.
 
   # ---------------------------------------------------------------- STMicroelectronics
   - vendorId: '0483'
@@ -163,9 +163,9 @@ devices:
     openocdInterface: interface/stlink.cfg
     notes:
       - One USB cable provides the debugger and a CDC ACM virtual COM port (/dev/ttyACM*) wired to the target UART.
-      - Use the same device for a USBDebugger and a USBSerialPort; match the serial port with '@ID_PATH' or ID_SERIAL_SHORT plus ID_USB_INTERFACE_NUM.
+      - Use the same device for a USBDebugger and a USBSerialPort; match the serial port with ID_PATH or ID_SERIAL_SHORT plus ID_USB_INTERFACE_NUM.
   - vendorId: '0483'
-    productIds: ['374e', '374f', '3753', '3754']
+    productIds: ['374e', '374f', '3754']
     vendor: STMicroelectronics
     product: STLINK-V3 family
     class: usb-debugger-with-serial
@@ -174,7 +174,16 @@ devices:
     openocdInterface: interface/stlink.cfg
     notes:
       - Most STLINK-V3 variants (V3SET, V3MINI, V3E) also expose a virtual COM port; check `lsusb -v` or `ls /dev/ttyACM*` to confirm on your board.
-      - Id 3754 is on Labgrid's USBDebugger list but not in the local usb.ids database.
+      - Ids 374e, 374f and 3754 are in Labgrid's USBDebugger whitelist; 3754 is not in the local usb.ids database.
+  - vendorId: '0483'
+    productIds: ['3753']
+    vendor: STMicroelectronics
+    product: STLINK-V3 variant (virtual COM port and mass storage)
+    class: usb-serial
+    chip: stlink
+    serialNumber: unique
+    notes:
+      - This STLINK-V3 configuration is not in Labgrid's USBDebugger whitelist at v26.0-281, so only its virtual COM port is usable through Labgrid; switch the probe to a whitelisted configuration (374e, 374f, 3754) for OpenOCD.
   - vendorId: '0483'
     productIds: ['df11']
     vendor: STMicroelectronics
@@ -195,7 +204,7 @@ devices:
     serialNumber: unique
     openocdInterface: interface/jlink.cfg
     notes:
-      - Labgrid's USBDebugger matches the complete 0101-0108, 1001-102f and 1050-106f ranges; only the common ids are listed here.
+      - Labgrid's USBDebugger matches 0101-0105, 0107, 0108, 1001-102f and 1050-106f (there is no 0106); only the common ids are listed here.
       - OpenOCD needs libjaylink support compiled in; the vendor J-Link software also works but is not driven by Labgrid.
 
   # ---------------------------------------------------------------- CMSIS-DAP probes
@@ -203,25 +212,25 @@ devices:
     productIds: ['0204']
     vendor: Arm (DAPLink)
     product: DAPLink CMSIS-DAP probe
-    class: usb-debugger-with-serial
+    class: usb-serial
     chip: daplink
     serialNumber: unique
-    openocdInterface: interface/cmsis-dap.cfg
     notes:
       - Found on Analog Devices MAX32xxx EVKITs, BBC micro:bit and many Cortex-M evaluation boards.
-      - Provides a CDC ACM console (/dev/ttyACM*) and a mass-storage drag-and-drop volume next to the debug interface.
+      - Provides a CDC ACM console (/dev/ttyACM*) and a mass-storage drag-and-drop volume next to the CMSIS-DAP debug interface (OpenOCD interface/cmsis-dap.cfg).
+      - Labgrid's USBDebugger resource does not match this id at v26.0-281, so OpenOCD flashing through Labgrid needs an upstream whitelist change; the console still works as a USBSerialPort.
       - usb.ids lists this id as "NXP ARM mbed"; DAPLink is the firmware name.
   - vendorId: '2e8a'
     productIds: ['000c']
     vendor: Raspberry Pi
     product: Raspberry Pi Debug Probe
-    class: usb-debugger-with-serial
+    class: usb-serial
     chip: daplink
     serialNumber: unique
-    openocdInterface: interface/cmsis-dap.cfg
     notes:
       - Id per the Raspberry Pi USB id registry; not in the local usb.ids database.
-      - Provides CMSIS-DAP plus a UART bridge on a second interface.
+      - Provides CMSIS-DAP (OpenOCD interface/cmsis-dap.cfg) plus a UART bridge on a second interface.
+      - Labgrid's USBDebugger resource does not match this id at v26.0-281, so OpenOCD flashing through Labgrid needs an upstream whitelist change; the console still works as a USBSerialPort.
   - vendorId: '2e8a'
     productIds: ['000a']
     vendor: Raspberry Pi
@@ -242,12 +251,13 @@ devices:
     productIds: ['6018']
     vendor: 1BitSquared
     product: Black Magic Probe
-    class: usb-debugger-with-serial
+    class: usb-serial
     chip: blackmagic
     serialNumber: unique
     notes:
       - Speaks the GDB remote protocol directly; OpenOCD is not the normal path, so Labgrid's OpenOCDDriver does not apply without extra tooling.
-      - The second CDC ACM interface is a plain UART that works as a USBSerialPort.
+      - The second CDC ACM interface is a plain UART that works as a USBSerialPort; add ID_USB_INTERFACE_NUM to pick it.
+      - Labgrid's USBDebugger resource does not match this id at v26.0-281, so OpenOCD flashing through Labgrid needs an upstream whitelist change; the console still works as a USBSerialPort.
 
   # ---------------------------------------------------------------- Espressif, Arduino
   - vendorId: '303a'
@@ -375,6 +385,7 @@ devices:
     class: usb-sd-mux
     notes:
       - Id per Labgrid's USBSDMuxDevice; usb.ids names the controller a Microchip hub and media card controller.
+      - Match with the ID_PATH that labgrid-suggest prints for the 0424:4041 device, or use the upstream example's '@ID_PATH' of the hub port it is plugged into. '@' keys only match parents, so never put the device's own path under '@ID_PATH'.
       - Needs the `usbsdmux` tool on the exporter host.
   - vendorId: '04e8'
     productIds: ['6001']
@@ -415,18 +426,18 @@ devices:
     product: KitProg3 debug probe
     class: usb-debugger
     serialNumber: unique
-    openocdInterface: interface/kitprog3.cfg
+    openocdInterface: interface/cmsis-dap.cfg
     notes:
-      - Id per Labgrid's USBDebugger list; the interface script name follows upstream OpenOCD and may require a recent release.
+      - Id per Labgrid's USBDebugger list. In CMSIS-DAP mode the probe uses interface/cmsis-dap.cfg; OpenOCD 0.12 ships no kitprog3.cfg (interface/kitprog.cfg is for the older KitProg).
   - vendorId: '09fb'
     productIds: ['6010', '6810']
     vendor: Altera / Intel
     product: USB-Blaster and USB-Blaster II
-    class: usb-debugger
+    class: altera-usb-blaster
     serialNumber: unique
     openocdInterface: interface/altera-usb-blaster.cfg
     notes:
-      - Labgrid has a dedicated AlteraUSBBlaster resource; OpenOCDDriver accepts it as well. USB-Blaster II uses interface/altera-usb-blaster2.cfg.
+      - Labgrid matches these ids with its AlteraUSBBlaster resource (not USBDebugger); OpenOCDDriver binds to it. USB-Blaster II (6810) uses interface/altera-usb-blaster2.cfg.
   - vendorId: '064b'
     productIds: ['0617', '2500', '0283', '2503', '2504', '2507', '2508', '250a', '250c', '250d']
     vendor: Analog Devices
@@ -520,41 +531,41 @@ devices:
     productIds: ['bef3']
     vendor: Texas Instruments
     product: XDS110 debug probe (on LaunchPad boards)
-    class: usb-debugger-with-serial
+    class: usb-serial
     chip: xds110
     serialNumber: unique
-    openocdInterface: interface/xds110.cfg
     notes:
-      - usb.ids names the id after the CC1352R1 LaunchPad; the XDS110 firmware on most TI LaunchPads uses it and also exposes a CDC ACM back-channel UART.
+      - usb.ids names the id after the CC1352R1 LaunchPad; the XDS110 firmware on most TI LaunchPads uses it and also exposes a CDC ACM back-channel UART (OpenOCD interface/xds110.cfg for the debug side).
+      - Labgrid's USBDebugger resource does not match this id at v26.0-281, so OpenOCD flashing through Labgrid needs an upstream whitelist change; the console still works as a USBSerialPort.
   - vendorId: '1fc9'
     productIds: ['0090']
     vendor: NXP
     product: LPC-Link2 CMSIS-DAP probe
-    class: usb-debugger-with-serial
+    class: usb-serial
     chip: daplink
     serialNumber: unique
-    openocdInterface: interface/cmsis-dap.cfg
     notes:
-      - Id per the LPC-Link2 CMSIS-DAP firmware; not in the local usb.ids database. Hedge; check `lsusb -v` for the interface list.
+      - Id per the LPC-Link2 CMSIS-DAP firmware; not in the local usb.ids database. Check `lsusb -v` for the interface list.
+      - Labgrid's USBDebugger resource does not match this id at v26.0-281, so OpenOCD flashing through Labgrid needs an upstream whitelist change; the console still works as a USBSerialPort.
   - vendorId: '1fc9'
     productIds: ['0143']
     vendor: NXP
     product: MCU-Link CMSIS-DAP probe
-    class: usb-debugger-with-serial
+    class: usb-serial
     chip: daplink
     serialNumber: unique
-    openocdInterface: interface/cmsis-dap.cfg
     notes:
       - Id per the MCU-Link CMSIS-DAP firmware; not in the local usb.ids database. Provides a VCOM port as well.
+      - Labgrid's USBDebugger resource does not match this id at v26.0-281, so OpenOCD flashing through Labgrid needs an upstream whitelist change; the console still works as a USBSerialPort.
   - vendorId: '0403'
     productIds: ['cff8']
     vendor: Amontec
     product: JTAGkey (FTDI-based)
-    class: usb-debugger
+    class: unsupported
     chip: ftdi
     serialNumber: usually-unique
     notes:
-      - OpenOCD script interface/ftdi/jtagkey.cfg; set interface_config to that file.
+      - FTDI-based probe with a custom product id. Labgrid's USBDebugger whitelist only contains 0403:6010 and 0403:6014 at v26.0-281, so it is not matched; OpenOCD itself supports it with interface/ftdi/jtagkey.cfg.
   - vendorId: '03fd'
     productIds: ['0008']
     vendor: Xilinx

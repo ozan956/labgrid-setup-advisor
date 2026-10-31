@@ -1,5 +1,6 @@
 import { DecisionEngine } from '../engine/decision-engine';
 import type { Answers, UseCaseDefinition } from '../engine/types';
+import { findBoard as findBoardEntry, findPduModel } from './catalog';
 import { devicesWithRole } from './profile';
 import type {
   BenchDevice,
@@ -14,11 +15,11 @@ import type {
 type Values = Record<string, string>;
 
 function findBoard(catalog: HardwareCatalog, id: string | undefined): BoardPreset | undefined {
-  return id ? catalog.boards.find((board) => board.id === id) : undefined;
+  return id ? findBoardEntry(catalog, id) : undefined;
 }
 
 function findPdu(catalog: HardwareCatalog, model: string): PduModelEntry | undefined {
-  return catalog.pduModels.find((entry) => entry.model === model);
+  return findPduModel(catalog, model);
 }
 
 function optionExists(definition: UseCaseDefinition, questionId: string, value: string | undefined): value is string {

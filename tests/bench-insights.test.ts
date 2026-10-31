@@ -171,3 +171,25 @@ describe('bench insights', () => {
     expect(found).toContain('ready');
   });
 });
+
+describe('review fixes', () => {
+  it('warns that manual power is ignored next to a real controller', () => {
+    const manual: BenchDevice = { id: 'dev-9', label: 'Hand switch', kind: 'manual-power' };
+    const found = ids(analyzeProfile(profile({}, [ftdi, netio, manual]), catalog));
+    expect(found).toContain('redundant-manual-power');
+    expect(ids(analyzeProfile(profile({}, [ftdi, manual]), catalog))).not.toContain('redundant-manual-power');
+  });
+
+  it('does not call the bench complete while login lacks a console', () => {
+    const withLogin = profile({ login: { username: 'root', prompt: 'root@[\\w-]+:[^ ]+ ', loginPrompt: ' login: ' } }, [netio]);
+    const found = ids(analyzeProfile(withLogin, catalog));
+    expect(found).toContain('login-without-console');
+    expect(found).not.toContain('ready');
+    expect(found).not.toContain('strategy-ready');
+  });
+
+  it('links reservations to an existing documentation page', () => {
+    const insights = analyzeProfile(profile({ topology: 'remote', sharing: 'team', names: { ...emptyProfile().names, exporterHost: 'lab' } }, [ftdi]), catalog);
+    for (const insight of insights) for (const doc of insight.docs ?? []) expect(doc.url).not.toContain('#places-and-reservations');
+  });
+});

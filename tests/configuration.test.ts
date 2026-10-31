@@ -58,6 +58,13 @@ describe('placeholder values', () => {
     expect(parse(quoted[0].content)).toEqual({ host: "it's" });
   });
 
+  it('keeps significant whitespace in substituted values', () => {
+    const engine = new DecisionEngine(validDefinition());
+    const [generated] = engine.configurations({ 'power-source': 'external' }, { PDU_HOST: ' login: ' });
+    expect(parse(generated.content)).toEqual({ host: ' login: ' });
+    expect(generated.applied).toEqual({ PDU_HOST: ' login: ' });
+  });
+
   it('ignores blank values and values for undeclared tokens', () => {
     const engine = new DecisionEngine(validDefinition());
     const [generated] = engine.configurations({ 'power-source': 'external' }, { PDU_HOST: '  ', OTHER: 'x' });

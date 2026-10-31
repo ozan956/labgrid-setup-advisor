@@ -37,7 +37,7 @@ collected and reported together.
 | --- | --- |
 | `vendorId`, `productIds` | Quoted lowercase hex. Quote them; `04e8` would otherwise parse as a number. |
 | `vendor`, `product` | Names as in the usb.ids database where available. |
-| `class` | `usb-serial`, `usb-debugger`, `usb-debugger-with-serial`, `dfu`, `fastboot`, `ykush`, `usb-hub`, `usb-sd-mux`, `usb-sd-wire`, `imx-usb-loader`, `hid-relay`, `sispm`, `lxa-usb-mux`, `usb-storage`, `root-hub`, `unsupported`. |
+| `class` | `usb-serial`, `usb-debugger`, `usb-debugger-with-serial`, `altera-usb-blaster`, `dfu`, `fastboot`, `ykush`, `usb-hub`, `usb-sd-mux`, `usb-sd-wire`, `imx-usb-loader`, `hid-relay`, `sispm`, `lxa-usb-mux`, `usb-storage`, `root-hub`, `unsupported`. |
 | `chip` | Converter or probe family (`ftdi`, `cp210x`, `ch340`, `pl2303`, `stlink`, `jlink`, `daplink`, ...). |
 | `serialNumber` | `unique`, `usually-unique`, `shared`, or `none`; selects `ID_SERIAL_SHORT` versus `ID_PATH`. |
 | `openocdInterface` | Suggested OpenOCD interface script for probes. |

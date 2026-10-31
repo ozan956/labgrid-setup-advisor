@@ -58,7 +58,7 @@ describe('buildChecklist', () => {
     expect(all).toContain('labgrid-client -x coordinator.lab:20408 -p imx8mm-01 console');
     expect(all).toContain('labgrid-client -x coordinator.lab:20408 -p imx8mm-01 power cycle');
     expect(all).toContain('labgrid-client -x coordinator.lab:20408 -p imx8mm-01 set-tags board=i-mx-8m-mini-evk');
-    expect(all).toContain('labgrid-client -x coordinator.lab:20408 reserve --wait board=i-mx-8m-mini-evk');
+    expect(all).toContain('eval "$(labgrid-client -x coordinator.lab:20408 reserve --wait --shell board=i-mx-8m-mini-evk)"');
     expect(all).toContain('pytest --lg-env remote.yaml -v');
     expect(steps.find((step) => step.id === 'start-exporter')?.target).toBe('exporter-host');
     expect(steps.find((step) => step.id === 'create-place')?.target).toBe('client');
@@ -76,13 +76,47 @@ describe('buildChecklist', () => {
     expect(commands(steps).some((command) => command.includes(' -x '))).toBe(false);
   });
 
-  it('adds named matches when a class repeats', () => {
+  it('names the console in client commands when a class repeats, without add-named-match', () => {
     const profile = remoteProfile();
     profile.devices.push({ id: 'dev-4', kind: 'usb-serial', label: 'Debug UART', match: { ID_SERIAL_SHORT: 'B50285BI' }, speed: 115200 });
     const steps = buildChecklist(profile, catalog, generateBenchFiles(profile, catalog));
     const create = steps.find((step) => step.id === 'create-place');
-    expect(create?.commands).toContain('labgrid-client -x coordinator.lab:20408 -p imx8mm-01 add-named-match labhost/imx8mm-01/USBSerialPort/console console');
-    expect(create?.commands).toContain('labgrid-client -x coordinator.lab:20408 -p imx8mm-01 add-named-match labhost/imx8mm-01/USBSerialPort/debug-uart debug-uart');
+    expect(create?.commands).toEqual([
+      'labgrid-client -x coordinator.lab:20408 -p imx8mm-01 create',
+      'labgrid-client -x coordinator.lab:20408 -p imx8mm-01 add-match labhost/imx8mm-01/*',
+    ]);
+    expect(create?.detail).toContain('come from the keys in exporter.yaml');
+    const acquire = steps.find((step) => step.id === 'acquire');
+    expect(acquire?.commands).toContain('labgrid-client -x coordinator.lab:20408 -p imx8mm-01 console console');
+    expect(acquire?.commands).toContain('labgrid-client -x coordinator.lab:20408 -p imx8mm-01 power cycle');
+  });
+
+  it('reserves through --shell so the + place works', () => {
+    const profile = remoteProfile();
+    const share = buildChecklist(profile, catalog, generateBenchFiles(profile, catalog)).find((step) => step.id === 'share');
+    expect(share?.commands).toEqual([
+      'labgrid-client -x coordinator.lab:20408 -p imx8mm-01 set-tags board=i-mx-8m-mini-evk',
+      'eval "$(labgrid-client -x coordinator.lab:20408 reserve --wait --shell board=i-mx-8m-mini-evk)"',
+      'labgrid-client -x coordinator.lab:20408 -p + acquire',
+      'labgrid-client -x coordinator.lab:20408 -p + console',
+      'labgrid-client -x coordinator.lab:20408 -p + release',
+    ]);
+    expect(share?.detail).toContain('LG_RESERVATION');
+  });
+
+  it('points IMXUSBDriver users at the barebox imx-usb-loader and guards the console snippet', () => {
+    const remote = remoteProfile();
+    remote.devices.push({ id: 'dev-9', kind: 'imx-usb-loader', label: 'SDP', match: { ID_PATH: 'pci-0000:00:14.0-usb-0:3' } });
+    const tools = buildChecklist(remote, catalog, generateBenchFiles(remote, catalog)).find((step) => step.id === 'install-tools');
+    expect(tools?.commands?.some((command) => command.includes('barebox'))).toBe(true);
+    expect(tools?.commands?.some((command) => command.includes('boundarydevices'))).toBe(false);
+    const local: BenchProfile = {
+      ...emptyProfile(),
+      devices: [{ id: 'dev-1', kind: 'usb-serial', label: 'Console', match: { ID_SERIAL_SHORT: 'A1' }, speed: 115200 }],
+    };
+    const snippet = buildChecklist(local, catalog, generateBenchFiles(local, catalog)).find((step) => step.id === 'try-environment');
+    expect(snippet?.commands?.[0]).toContain('try:');
+    expect(snippet?.commands?.[0]).toContain('except Exception');
   });
 
   it('gives a local user a Python snippet and pytest instead of client commands', () => {

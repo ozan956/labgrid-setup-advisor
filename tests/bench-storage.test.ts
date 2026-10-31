@@ -68,6 +68,16 @@ describe('bench profile validation', () => {
     expect(validateProfile(badUsbId).profile).toBeUndefined();
     const badMatchKey = { ...sample(), devices: [{ id: 'a', label: 'A', kind: 'dfu', match: { 'bad key': 'x' } }] };
     expect(validateProfile(badMatchKey).profile).toBeUndefined();
+    const upperCaseId = { ...sample(), devices: [{ id: 'a', label: 'A', kind: 'unsupported-usb', usbId: { vendorId: '10C4', productId: 'EA60' } }] };
+    expect(validateProfile(upperCaseId).profile).toBeUndefined();
+    const ykushPortFour = { ...sample(), devices: [{ id: 'a', label: 'A', kind: 'ykush', serial: 'Y3N1', index: '4' }] };
+    expect(validateProfile(ykushPortFour).profile).toBeUndefined();
+    const ykushAll = { ...sample(), devices: [{ id: 'a', label: 'A', kind: 'ykush', serial: 'Y3N1', index: 'a' }] };
+    expect(validateProfile(ykushAll).profile).toBeDefined();
+    const blaster = { ...sample(), devices: [{ id: 'a', label: 'A', kind: 'usb-debugger', match: { ID_PATH: 'x' }, resourceClass: 'AlteraUSBBlaster' }] };
+    expect(validateProfile(blaster).profile).toBeDefined();
+    const badClass = { ...sample(), devices: [{ id: 'a', label: 'A', kind: 'usb-debugger', match: { ID_PATH: 'x' }, resourceClass: 'Probe' }] };
+    expect(validateProfile(badClass).profile).toBeUndefined();
   });
 });
 

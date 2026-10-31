@@ -89,6 +89,12 @@ export interface UsbDebuggerDevice extends DeviceBase {
   kind: 'usb-debugger';
   usbId?: UsbId;
   match: UdevMatch;
+  /**
+   * Labgrid resource class for the probe. USBDebugger only matches the ids in
+   * its upstream whitelist (FTDI, ST-LINK, KitProg3, Olimex, J-Link, ADI ICE);
+   * Altera/Intel USB-Blasters use AlteraUSBBlaster. Defaults to USBDebugger.
+   */
+  resourceClass?: 'USBDebugger' | 'AlteraUSBBlaster';
   /** OpenOCD interface script, e.g. 'interface/stlink.cfg'. */
   interfaceConfig?: string;
   /** OpenOCD board script, e.g. 'board/st_nucleo_f4.cfg'. */
@@ -210,6 +216,7 @@ export type UsbDeviceClass =
   | 'usb-serial'
   | 'usb-debugger'
   | 'usb-debugger-with-serial'
+  | 'altera-usb-blaster'
   | 'dfu'
   | 'fastboot'
   | 'ykush'

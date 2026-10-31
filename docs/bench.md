@@ -44,7 +44,7 @@ Names must match `^[A-Za-z0-9][A-Za-z0-9._-]*$` (`NAME_PATTERN` in
 | `usb-debugger` | debug | `USBDebugger` | `OpenOCDDriver` | `match`, optional `interfaceConfig`, `boardConfig` |
 | `dfu` | debug | `DFUDevice` | `DFUDriver` | `match` |
 | `fastboot` | debug | `AndroidUSBFastboot` | `AndroidFastbootDriver` | `match`, `usbId` |
-| `usb-sd-mux` | storage | `USBSDMuxDevice` | `USBSDMuxDriver` | `match` (`@ID_PATH`) |
+| `usb-sd-mux` | storage | `USBSDMuxDevice` | `USBSDMuxDriver` | `match` (`ID_PATH`) |
 | `usb-storage` | storage | `USBMassStorage` | `USBStorageDriver` | `match` |
 | `imx-usb-loader` | bootstrap | `IMXUSBLoader` | `IMXUSBDriver` | `match` |
 | `network-service` | network | `NetworkService` | `SSHDriver` | `address`, `username`, `port` |
@@ -77,8 +77,15 @@ class picks the device kind; the entry's `serialNumber` quality and
   port.
 - `ID_USB_INTERFACE_NUM` in addition when one converter exposes several UARTs
   (FT2232, FT4232, CP2105, CP2108).
-- `'@ID_PATH'` for `USBSDMuxDevice`, where the match applies to the parent USB
-  device, as in the upstream examples.
+- `ID_PATH` of the mux's own USB device for `USBSDMuxDevice` (the SCSI and
+  interface suffixes of the block device path are removed), which is what
+  `labgrid-suggest` prints. The upstream examples use `'@ID_PATH'` with the
+  path of the hub port instead; `@` keys only match parents, so the two values
+  differ.
+- Probes are only generated as `USBDebugger` when their id is in the upstream
+  whitelist (FTDI 6010/6014, ST-LINK, KitProg3, Olimex, J-Link, ADI ICE).
+  CMSIS-DAP probes such as DAPLink are detected as consoles only, and
+  USB-Blasters become `AlteraUSBBlaster` through `resourceClass`.
 - `ID_PATH` with the `:1.0` interface suffix for `USBPowerPort`.
 
 Candidates carry a confidence: `high` when the match values are known
@@ -106,7 +113,8 @@ critical, warning, info, success. Per-device rules use `rule:deviceId` ids.
 | `usb-hub-power-budget` | warning | USB-powered board that draws more than a hub port supplies. |
 | `pdu-host-format` | warning | URL given to a plain-host backend or the reverse. |
 | `remote-exporter-name` | warning | Remote topology without an exporter name. |
-| `login-without-console` | warning | Login or bootloader given but no console. |
+| `login-without-console` | warning | Login or bootloader given but no console; also suppresses `ready`. |
+| `redundant-manual-power` | warning | Manual power listed next to a real controller; the manual entry is not generated. |
 | `no-power` | info | No power device; only `ManualPowerDriver` is possible. |
 | `multi-interface-serial` | info | Multi-UART chip without `ID_USB_INTERFACE_NUM`. |
 | `debugger-serial-port` | info | The probe also provides a virtual COM port. |
@@ -145,13 +153,19 @@ Rules:
   class repeats, or there are several consoles or power controls, resources and
   drivers switch to the documented list form with `name:` and `bindings:`.
   In `exporter.yaml` repeated classes become `<slug>: { cls: <Class>, ... }`
-  entries, and the checklist uses `add-named-match` for them.
+  entries. The client takes those keys as resource names, so the wildcard
+  `add-match` is enough; `add-named-match` is not used. Every `bindings:`
+  value names a driver instance; a driver that is only referenced by a
+  binding receives an explicit `name` for that purpose.
 - `ShellDriver` is added when `login` is set; `UBootDriver` or `BareboxDriver`
   when `bootloader` is set. `UBootStrategy` or `BareboxStrategy` is added when
   bootloader, power, and login exist; `ShellStrategy` when power and login
-  exist without a bootloader.
+  exist without a bootloader. All of these need a console device; without one
+  they are left out and the `login-without-console` insight explains why.
 - `manual-power` adds `ManualPowerDriver` with the board or place name and no
-  resource.
+  resource. When a real power controller exists as well, the manual entry is
+  left out (two `PowerProtocol` drivers would make the target ambiguous) and
+  the `redundant-manual-power` insight says so.
 - YKUSH `index` is written as a string, `USBPowerPort` and `NetworkPowerPort`
   indices as numbers, matching the upstream constructors.
 - Missing values are written as `<TOKEN>` (for example `<ID_PATH>`,
@@ -178,7 +192,7 @@ the profile needs them:
 | `device-access` | any USB device (dialout group) |
 | `fill-placeholders` | a generated file has unresolved tokens (`labgrid-suggest`, `udevadm info`) |
 | `start-coordinator`, `start-exporter`, `check-resources`, `create-place`, `acquire` | remote topology |
-| `share` | remote topology with `sharing: team` (`set-tags`, `reserve --wait`, `-p +`) |
+| `share` | remote topology with `sharing: team` (`set-tags`, `eval "$(labgrid-client reserve --wait --shell ...)"`, then `-p +`) |
 | `try-environment` | local topology (Python snippet with `Environment`) |
 | `run-tests` | always (`pytest --lg-env <file>`) |
 | `verify` | always |

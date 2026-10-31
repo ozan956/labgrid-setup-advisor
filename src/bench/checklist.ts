@@ -39,7 +39,7 @@ function toolNeeds(devices: BenchDevice[], remote: boolean): ToolNeed[] {
     needs.push({ tool: 'fastboot', install: 'sudo apt install fastboot', reason: 'AndroidFastbootDriver runs fastboot.' });
   }
   if (kinds.has('imx-usb-loader')) {
-    needs.push({ tool: 'imx-usb-loader', install: '# build imx_usb_loader from https://github.com/boundarydevices/imx_usb_loader', reason: 'IMXUSBDriver runs imx-usb-loader.' });
+    needs.push({ tool: 'imx-usb-loader', install: '# build imx-usb-loader from the barebox sources (scripts/imx): https://github.com/barebox/barebox', reason: 'IMXUSBDriver runs the imx-usb-loader tool from barebox (BDIMXUSBDriver would use imx_usb by Boundary Devices instead)' });
   }
   if (remote && kinds.has('usb-serial')) {
     needs.push({ tool: 'ser2net', install: 'sudo apt install ser2net', reason: 'The exporter shares USB serial ports through ser2net.' });
@@ -79,7 +79,7 @@ export function resourceClassOf(device: BenchDevice): string | undefined {
     case 'network-pdu': return 'NetworkPowerPort';
     case 'ykush': return 'YKUSHPowerPort';
     case 'usb-hub-port': return 'USBPowerPort';
-    case 'usb-debugger': return 'USBDebugger';
+    case 'usb-debugger': return device.resourceClass ?? 'USBDebugger';
     case 'dfu': return 'DFUDevice';
     case 'fastboot': return 'AndroidUSBFastboot';
     case 'usb-sd-mux': return 'USBSDMuxDevice';
@@ -234,35 +234,32 @@ export function buildChecklist(profile: BenchProfile, catalog: HardwareCatalog, 
 
     const names = exporterResourceNames(profile.devices);
     const named = namedDeviceIds(profile.devices);
-    const matchCommands = [
-      `labgrid-client${coordinatorFlag(profile)} -p ${place} create`,
-      `labgrid-client${coordinatorFlag(profile)} -p ${place} add-match ${exporterHost}/${group}/*`,
-    ];
-    for (const device of profile.devices) {
-      if (!named.has(device.id)) continue;
-      const cls = resourceClassOf(device);
-      const name = names.get(device.id) ?? slugify(device.label);
-      if (cls) matchCommands.push(`labgrid-client${coordinatorFlag(profile)} -p ${place} add-named-match ${exporterHost}/${group}/${cls}/${name} ${name}`);
-    }
     steps.push({
       id: 'create-place',
       title: `Create the place ${place} and attach the resources`,
       detail: named.size > 0
-        ? `A place groups the resources of one board. Because several consoles or power controls exist, add-named-match gives each one the name used in the bindings of ${envName}.`
+        ? `A place groups the resources of one board. The wildcard match takes every resource from your exporter group; the resource names used in the bindings of ${envName} come from the keys in exporter.yaml, so no extra match is needed.`
         : 'A place groups the resources of one board. The wildcard match takes every resource from your exporter group.',
       target: 'client',
-      commands: matchCommands,
+      commands: [
+        `labgrid-client${coordinatorFlag(profile)} -p ${place} create`,
+        `labgrid-client${coordinatorFlag(profile)} -p ${place} add-match ${exporterHost}/${group}/*`,
+      ],
       docs: [DOCS.client],
     });
+    // With several consoles or power controls, labgrid-client needs the resource name.
+    const consoleName = consoles.length > 1 ? names.get(consoles[0].id) : undefined;
+    const powerResources = power.filter((device) => resourceClassOf(device));
+    const powerName = powerResources.length > 1 ? names.get(powerResources[0].id) : undefined;
     steps.push({
       id: 'acquire',
       title: 'Acquire the place and try it',
-      detail: 'Acquiring locks the board for you. Release it when you are done so colleagues and CI can use it.',
+      detail: `Acquiring locks the board for you. Release it when you are done so colleagues and CI can use it.${consoleName || powerName ? ' Because several resources of the same kind exist, the commands name the one to use.' : ''}`,
       target: 'client',
       commands: [
         `labgrid-client${coordinatorFlag(profile)} -p ${place} acquire`,
-        ...(consoles.length > 0 ? [`labgrid-client${coordinatorFlag(profile)} -p ${place} console`] : []),
-        ...(power.length > 0 ? [`labgrid-client${coordinatorFlag(profile)} -p ${place} power cycle`] : []),
+        ...(consoles.length > 0 ? [`labgrid-client${coordinatorFlag(profile)} -p ${place} console${consoleName ? ` ${consoleName}` : ''}`] : []),
+        ...(powerResources.length > 0 || power.length > 0 ? [`labgrid-client${coordinatorFlag(profile)} -p ${place} power cycle${powerName ? ` ${powerName}` : ''}`] : []),
         `labgrid-client${coordinatorFlag(profile)} -p ${place} release`,
       ],
       docs: [DOCS.client],
@@ -272,12 +269,14 @@ export function buildChecklist(profile: BenchProfile, catalog: HardwareCatalog, 
       steps.push({
         id: 'share',
         title: 'Tag the place so colleagues and CI can reserve it',
-        detail: 'Tags let a reservation ask for any board of a kind instead of a fixed place. The reservation id can be used as the place with a plus sign.',
+        detail: 'Tags let a reservation ask for any board of a kind instead of a fixed place. reserve --shell prints an export line for LG_RESERVATION; after eval, "+" stands for the reserved place in every labgrid-client command.',
         target: 'client',
         commands: [
           `labgrid-client${coordinatorFlag(profile)} -p ${place} set-tags board=${tag}`,
-          `labgrid-client${coordinatorFlag(profile)} reserve --wait board=${tag}`,
+          `eval "$(labgrid-client${coordinatorFlag(profile)} reserve --wait --shell board=${tag})"`,
           `labgrid-client${coordinatorFlag(profile)} -p + acquire`,
+          ...(consoles.length > 0 ? [`labgrid-client${coordinatorFlag(profile)} -p + console`] : []),
+          `labgrid-client${coordinatorFlag(profile)} -p + release`,
         ],
         docs: [DOCS.usage],
       });
@@ -303,7 +302,13 @@ export function buildChecklist(profile: BenchProfile, catalog: HardwareCatalog, 
         ? ["power = target.get_driver('PowerProtocol')", 'power.cycle()']
         : []),
       ...(consoles.length > 0
-        ? ["console = target.get_driver('ConsoleProtocol')", 'print(console.read(timeout=5))']
+        ? [
+            "console = target.get_driver('ConsoleProtocol')",
+            'try:',
+            '    print(console.read(timeout=5))',
+            'except Exception as error:  # a quiet console raises a timeout',
+            "    print('no console output within 5 s:', error)",
+          ]
         : []),
     ];
     steps.push({

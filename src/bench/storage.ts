@@ -1,3 +1,4 @@
+import { findPduModel, findUsbDevice } from './catalog';
 import Ajv from 'ajv';
 import schema from '../../schemas/bench-profile.schema.json';
 import type { BenchDevice, BenchProfile, HardwareCatalog } from './types';
@@ -118,20 +119,14 @@ function chipName(chip: string | undefined): string | undefined {
 }
 
 function describeDevice(device: BenchDevice, catalog: HardwareCatalog): string | undefined {
-  const usbEntry = 'usbId' in device && device.usbId
-    ? catalog.usbDevices.find(
-        (entry) =>
-          entry.vendorId.toLowerCase() === device.usbId!.vendorId.toLowerCase() &&
-          entry.productIds.some((product) => product.toLowerCase() === device.usbId!.productId.toLowerCase()),
-      )
-    : undefined;
+  const usbEntry = 'usbId' in device && device.usbId ? findUsbDevice(catalog, device.usbId) : undefined;
   switch (device.kind) {
     case 'usb-serial':
       return `${chipName(usbEntry?.chip) ?? 'USB serial'} console`;
     case 'network-serial':
       return 'network serial console';
     case 'network-pdu':
-      return `${catalog.pduModels.find((entry) => entry.model === device.model)?.family ?? device.model} PDU`;
+      return `${findPduModel(catalog, device.model)?.family ?? device.model} PDU`;
     case 'ykush':
       return 'YKUSH power';
     case 'usb-hub-port':
