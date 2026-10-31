@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { GeneratedConfiguration } from '../engine/decision-engine';
+import { downloadText } from './bench/shared';
 import { Icon } from './Icons';
 
 export function ConfigurationCard({ configuration }: { configuration: GeneratedConfiguration }) {
@@ -23,11 +24,22 @@ export function ConfigurationCard({ configuration }: { configuration: GeneratedC
           <h3>{configuration.definition.title}</h3>
           <code>{configuration.definition.filename}</code>
         </div>
-        <button className="copy-button" onClick={copy} aria-live="polite">
-          <Icon name="copy" /> {copyState}
-        </button>
+        <div className="file-actions">
+          <button className="copy-button" onClick={copy} aria-live="polite">
+            <Icon name="copy" /> {copyState}
+          </button>
+          <button
+            className="copy-button"
+            onClick={() => downloadText(configuration.definition.filename, configuration.content)}
+            aria-label={`Download ${configuration.definition.filename}`}
+          >
+            <Icon name="arrow" /> Download
+          </button>
+        </div>
       </header>
-      {!configuration.ready && (
+      {configuration.ready ? (
+        <div className="ready-notice"><Icon name="check" /> Ready to use</div>
+      ) : (
         <div className="template-notice">
           <strong>Template — not ready to run</strong>
           <span>Replace {configuration.unresolved.length} required value{configuration.unresolved.length === 1 ? '' : 's'} first.</span>
@@ -47,4 +59,3 @@ export function ConfigurationCard({ configuration }: { configuration: GeneratedC
     </article>
   );
 }
-

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import type { Prefill } from '../bench/types';
 import { DecisionEngine } from '../engine/decision-engine';
 import type { Answers, UseCaseDefinition } from '../engine/types';
 import { Icon } from './Icons';
@@ -7,6 +8,7 @@ interface Props {
   definition: UseCaseDefinition;
   answers: Answers;
   questionIndex: number;
+  prefill?: Prefill;
   onAnswer: (questionId: string, value: string) => void;
   onIndexChange: (index: number) => void;
   onComplete: () => void;
@@ -17,6 +19,7 @@ export function Wizard({
   definition,
   answers,
   questionIndex,
+  prefill,
   onAnswer,
   onIndexChange,
   onComplete,
@@ -27,6 +30,10 @@ export function Wizard({
   const safeIndex = Math.min(questionIndex, Math.max(visible.length - 1, 0));
   const question = visible[safeIndex];
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const prefilledCount = prefill
+    ? visible.filter((item) => prefill.answers[item.id] !== undefined && answers[item.id] === prefill.answers[item.id]).length
+    : 0;
+  const complete = engine.answerStatus(answers).complete;
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -52,6 +59,17 @@ export function Wizard({
         </div>
       </div>
 
+      {prefilledCount > 0 && (
+        <div className="prefill-banner" role="status">
+          <span>
+            {prefilledCount} {prefilledCount === 1 ? 'answer was' : 'answers were'} filled from your bench. Check them or jump to the results.
+          </span>
+          {complete && (
+            <button className="button secondary" onClick={onComplete}>Jump to results <Icon name="arrow" /></button>
+          )}
+        </div>
+      )}
+
       <section className="question-panel">
         <h1 ref={headingRef} tabIndex={-1}>{question.text}</h1>
         <p className="question-help">{question.help}</p>
@@ -59,6 +77,7 @@ export function Wizard({
         <div className="option-list" role="group" aria-label={question.text}>
           {question.options.map((option) => {
             const active = selected === option.value;
+            const fromBench = prefill?.answers[question.id] === option.value;
             return (
               <button
                 className={`option-card ${active ? 'is-selected' : ''}`}
@@ -68,7 +87,7 @@ export function Wizard({
               >
                 <span className="option-marker">{active ? <Icon name="check" /> : null}</span>
                 <span>
-                  <strong>{option.label}</strong>
+                  <strong>{option.label}{fromBench && <span className="prefill-chip small">From your bench</span>}</strong>
                   <small>{option.description}</small>
                 </span>
               </button>
