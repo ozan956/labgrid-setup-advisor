@@ -14,6 +14,10 @@ export { prefillForUseCase, prefillAll, applyPrefill } from './prefill';
 export { generateBenchFiles } from './generate';
 export { buildChecklist } from './checklist';
 export { createZip } from './zip';
-export { STORAGE_KEY, validateProfile, saveProfile, loadProfile, clearProfile, encodeShareHash, decodeShareHash, summarizeProfile } from './storage';
+export {
+  STORAGE_KEY, LAB_STORAGE_KEY, validateProfile, saveProfile, loadProfile, clearProfile, encodeShareHash, decodeShareHash, summarizeProfile,
+  validateLab, validateLabOrProfile, saveLab, loadLab, clearLab, encodeLabShareHash, decodeLabShareHash, hasShareHash, summarizeLab,
+} from './storage';
+export * from './lab';
 export { sampleBenches } from './samples';
 export type { SampleBench } from './samples';

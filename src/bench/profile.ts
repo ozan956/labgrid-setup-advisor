@@ -1,4 +1,4 @@
-import type { BenchDevice, BenchProfile, DeviceRole } from './types';
+import type { BenchDevice, BenchProfile, DeviceKind, DeviceRole } from './types';
 import { BENCH_PROFILE_VERSION } from './types';
 
 export const DEFAULT_COORDINATOR = '127.0.0.1:20408';
@@ -62,4 +62,30 @@ export function nextDeviceId(profile: BenchProfile): string {
 export function hasRequiredMatch(device: BenchDevice): boolean {
   if (!('match' in device)) return true;
   return Object.values(device.match).some((value) => value.trim().length > 0);
+}
+
+/** Device kinds a user can add by hand, in menu order. */
+export const ADDABLE_KINDS: DeviceKind[] = [
+  'usb-serial', 'network-serial', 'network-pdu', 'ykush', 'usb-hub-port', 'manual-power',
+  'usb-debugger', 'dfu', 'fastboot', 'usb-sd-mux', 'usb-storage', 'imx-usb-loader', 'network-service',
+];
+
+/** A new device of a kind with sensible defaults; the caller assigns the id. */
+export function blankDevice(kind: DeviceKind, id: string): BenchDevice {
+  switch (kind) {
+    case 'usb-serial': return { id, kind, label: 'Console', match: { ID_SERIAL_SHORT: '' }, speed: 115200 };
+    case 'network-serial': return { id, kind, label: 'Console', host: '', port: 4000, speed: 115200, protocol: 'rfc2217' };
+    case 'network-pdu': return { id, kind, label: 'PDU outlet', model: 'netio', host: '', index: 1 };
+    case 'ykush': return { id, kind, label: 'YKUSH port', serial: '', index: '1' };
+    case 'usb-hub-port': return { id, kind, label: 'Hub port', match: { ID_PATH: '' }, index: 1 };
+    case 'manual-power': return { id, kind, label: 'Manual power' };
+    case 'usb-debugger': return { id, kind, label: 'Debug probe', match: { ID_SERIAL_SHORT: '' } };
+    case 'dfu': return { id, kind, label: 'DFU bootloader', match: { ID_PATH: '' } };
+    case 'fastboot': return { id, kind, label: 'Fastboot', match: { ID_PATH: '' }, usbId: { vendorId: '18d1', productId: '4ee0' } };
+    case 'usb-sd-mux': return { id, kind, label: 'USB-SD-Mux', match: { ID_PATH: '' } };
+    case 'usb-storage': return { id, kind, label: 'USB storage', match: { ID_PATH: '' } };
+    case 'imx-usb-loader': return { id, kind, label: 'Serial download mode', match: { ID_PATH: '' } };
+    case 'network-service': return { id, kind, label: 'SSH', address: '', username: 'root', port: 22 };
+    default: return { id, kind: 'manual-power', label: 'Manual power' };
+  }
 }

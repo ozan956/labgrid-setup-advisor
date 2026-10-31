@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import type { BenchDevice, BenchProfile, BoardPreset, BoardVerification, DeviceKind, HardwareCatalog } from '../../bench/types';
 import { findBoard, searchBoards } from '../../bench/catalog';
-import { DEFAULT_COORDINATOR, NAME_PATTERN, nextDeviceId } from '../../bench/profile';
+import { ADDABLE_KINDS, DEFAULT_COORDINATOR, NAME_PATTERN, blankDevice, nextDeviceId } from '../../bench/profile';
 import { validateProfile } from '../../bench/storage';
 import { Icon } from '../Icons';
 import { DetectPanel } from './DetectPanel';
@@ -19,10 +19,6 @@ interface Props {
 
 const DEFAULT_LOGIN = { username: 'root', loginPrompt: ' login: ', prompt: 'root@[\\w-]+:[^ ]+ ' };
 const BOOTLOADER_PROMPTS = { uboot: '=> ', barebox: 'barebox@[^:]+:[^ ]+ ' };
-const ADDABLE_KINDS: DeviceKind[] = [
-  'usb-serial', 'network-serial', 'network-pdu', 'ykush', 'usb-hub-port', 'manual-power',
-  'usb-debugger', 'dfu', 'fastboot', 'usb-sd-mux', 'usb-storage', 'imx-usb-loader', 'network-service',
-];
 const RESET_CONFIRM_MS = 4000;
 
 /** Plain wording for how a preset's facts were confirmed. */
@@ -37,25 +33,6 @@ const VERIFICATION_OPTION_SUFFIX: Record<BoardVerification, string> = {
   docs: 'from documentation',
   unverified: 'not yet reviewed',
 };
-
-function blankDevice(kind: DeviceKind, id: string): BenchDevice {
-  switch (kind) {
-    case 'usb-serial': return { id, kind, label: 'Console', match: { ID_SERIAL_SHORT: '' }, speed: 115200 };
-    case 'network-serial': return { id, kind, label: 'Console', host: '', port: 4000, speed: 115200, protocol: 'rfc2217' };
-    case 'network-pdu': return { id, kind, label: 'PDU outlet', model: 'netio', host: '', index: 1 };
-    case 'ykush': return { id, kind, label: 'YKUSH port', serial: '', index: '1' };
-    case 'usb-hub-port': return { id, kind, label: 'Hub port', match: { ID_PATH: '' }, index: 1 };
-    case 'manual-power': return { id, kind, label: 'Manual power' };
-    case 'usb-debugger': return { id, kind, label: 'Debug probe', match: { ID_SERIAL_SHORT: '' } };
-    case 'dfu': return { id, kind, label: 'DFU bootloader', match: { ID_PATH: '' } };
-    case 'fastboot': return { id, kind, label: 'Fastboot', match: { ID_PATH: '' }, usbId: { vendorId: '18d1', productId: '4ee0' } };
-    case 'usb-sd-mux': return { id, kind, label: 'USB-SD-Mux', match: { ID_PATH: '' } };
-    case 'usb-storage': return { id, kind, label: 'USB storage', match: { ID_PATH: '' } };
-    case 'imx-usb-loader': return { id, kind, label: 'Serial download mode', match: { ID_PATH: '' } };
-    case 'network-service': return { id, kind, label: 'SSH', address: '', username: 'root', port: 22 };
-    default: return { id, kind: 'manual-power', label: 'Manual power' };
-  }
-}
 
 /** FileReader works in every browser and in jsdom; Blob.text() is not available everywhere. */
 function readFileText(file: File): Promise<string> {

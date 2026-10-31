@@ -205,6 +205,45 @@ export interface BenchProfile {
 }
 
 /* ------------------------------------------------------------------ */
+/* Lab: several benches sharing one exporter host and coordinator      */
+/* ------------------------------------------------------------------ */
+
+export const LAB_PROFILE_VERSION = 2 as const;
+
+export interface LabNames {
+  /** Hostname of the machine the hardware is plugged into when topology is remote. */
+  exporterHost: string;
+  /** Coordinator address as HOST[:PORT]. */
+  coordinator: string;
+  /** Optional physical location label shared by every exporter group. */
+  location: string;
+}
+
+/** One board with its devices inside a lab. Place and group are per bench; topology and hosts come from the lab. */
+export interface LabBench {
+  /** Stable id within the lab, e.g. 'bench-1'. Not a Labgrid name. */
+  id: string;
+  board: BenchProfile['board'];
+  /** Coordinator place name, e.g. 'board-01'. */
+  place: string;
+  /** Exporter group name. Defaults to the place name. */
+  group: string;
+  devices: BenchDevice[];
+  login?: LinuxLogin;
+  bootloader?: Bootloader;
+}
+
+export interface Lab {
+  version: typeof LAB_PROFILE_VERSION;
+  /** Free text, e.g. 'Rack 3'. */
+  name: string;
+  topology: Topology;
+  sharing: Sharing;
+  names: LabNames;
+  benches: LabBench[];
+}
+
+/* ------------------------------------------------------------------ */
 /* Hardware catalog (loaded from src/data/hardware/*.yaml)             */
 /* ------------------------------------------------------------------ */
 

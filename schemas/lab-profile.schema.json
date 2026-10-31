@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://labgrid.org/schemas/setup-advisor/lab-profile-v2.json",
+  "title": "Labgrid Setup Advisor lab profile",
+  "description": "Several benches (boards with their devices) sharing one exporter host and coordinator. Device definitions come from bench-profile-v1.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "name", "topology", "sharing", "names", "benches"],
+  "properties": {
+    "version": { "const": 2 },
+    "name": { "type": "string", "maxLength": 200 },
+    "topology": { "enum": ["local", "remote"] },
+    "sharing": { "enum": ["solo", "team"] },
+    "names": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exporterHost", "coordinator", "location"],
+      "properties": {
+        "exporterHost": { "type": "string", "maxLength": 253 },
+        "coordinator": { "type": "string", "maxLength": 260 },
+        "location": { "type": "string", "maxLength": 200 }
+      }
+    },
+    "benches": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": { "$ref": "#/definitions/bench" }
+    }
+  },
+  "definitions": {
+    "bench": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "board", "place", "group", "devices"],
+      "properties": {
+        "id": { "$ref": "https://labgrid.org/schemas/setup-advisor/bench-profile-v1.json#/definitions/deviceId" },
+        "board": { "$ref": "https://labgrid.org/schemas/setup-advisor/bench-profile-v1.json#/properties/board" },
+        "place": { "type": "string", "maxLength": 200 },
+        "group": { "type": "string", "maxLength": 200 },
+        "devices": { "$ref": "https://labgrid.org/schemas/setup-advisor/bench-profile-v1.json#/properties/devices" },
+        "login": { "$ref": "https://labgrid.org/schemas/setup-advisor/bench-profile-v1.json#/properties/login" },
+        "bootloader": { "$ref": "https://labgrid.org/schemas/setup-advisor/bench-profile-v1.json#/properties/bootloader" }
+      }
+    }
+  }
+}
