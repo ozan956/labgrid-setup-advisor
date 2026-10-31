@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import type { BenchProfile, HardwareCatalog, Prefill } from '../bench/types';
+import type { HardwareCatalog, Lab, Prefill } from '../bench/types';
+import { labDeviceCount } from '../bench/lab';
 import type { SampleBench } from '../bench/samples';
-import { summarizeProfile } from '../bench/storage';
+import { summarizeLab } from '../bench/storage';
 import type { CatalogEntry } from '../data';
 import { Icon } from './Icons';
 import { UseCaseCatalog } from './UseCaseCatalog';
 
 interface Props {
   entries: CatalogEntry[];
-  profile?: BenchProfile;
+  lab?: Lab;
   catalog: HardwareCatalog;
   prefills: Map<string, Prefill>;
   samples: SampleBench[];
@@ -21,22 +22,24 @@ interface Props {
   onLoadSample: (sample: SampleBench) => void;
 }
 
-export function Landing({ entries, profile, catalog, prefills, samples, notice, onSelect, onDescribe, onViewPlan, onEditBench, onLoadSample }: Props) {
+export function Landing({ entries, lab, catalog, prefills, samples, notice, onSelect, onDescribe, onViewPlan, onEditBench, onLoadSample }: Props) {
   const [showSamples, setShowSamples] = useState(false);
-  const hasBench = profile !== undefined && profile.devices.length > 0;
+  const hasBench = lab !== undefined && labDeviceCount(lab) > 0;
+  const manyBenches = lab !== undefined && lab.benches.length > 1;
+  const noun = manyBenches ? 'lab' : 'bench';
 
   return (
     <main id="main-content" className="landing-page page-shell">
       {notice && <div className="detect-error landing-notice" role="alert">{notice}</div>}
-      {hasBench && profile && (
-        <section className="bench-strip" aria-label="Your bench">
+      {hasBench && lab && (
+        <section className="bench-strip" aria-label={`Your ${noun}`}>
           <div>
-            <span className="section-kicker">Your bench</span>
-            <p>{summarizeProfile(profile, catalog)}</p>
+            <span className="section-kicker">Your {noun}{manyBenches ? ` · ${lab.benches.length} benches` : ''}</span>
+            <p>{summarizeLab(lab, catalog)}</p>
           </div>
           <div className="bench-strip-actions">
             <button className="button primary" onClick={onViewPlan}>View plan</button>
-            <button className="button secondary" onClick={onEditBench}>Edit bench</button>
+            <button className="button secondary" onClick={onEditBench}>Edit {noun}</button>
           </div>
         </section>
       )}
@@ -48,7 +51,7 @@ export function Landing({ entries, profile, catalog, prefills, samples, notice, 
           <p>Paste the output of lsusb or labgrid-suggest, pick your board, and get files that already contain your values.</p>
           <div className="start-card-actions">
             <button className="button primary large" onClick={onDescribe}>
-              {hasBench ? 'Edit my bench' : 'Describe my bench'} <Icon name="arrow" />
+              {hasBench ? `Edit my ${noun}` : 'Describe my bench'} <Icon name="arrow" />
             </button>
             <button className="text-button" onClick={() => setShowSamples((current) => !current)} aria-expanded={showSamples} aria-controls="sample-list">
               Try an example bench

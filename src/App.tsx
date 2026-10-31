@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { hardwareCatalog } from './bench/catalog';
+import { benchProfile, emptyLab, findBench, labDeviceCount, labFromProfile } from './bench/lab';
 import { applyPrefill, prefillForUseCase } from './bench/prefill';
-import { emptyProfile } from './bench/profile';
 import { sampleBenches, type SampleBench } from './bench/samples';
-import { clearProfile, decodeShareHash, loadProfile, saveProfile } from './bench/storage';
-import type { BenchProfile, Prefill } from './bench/types';
-import { BenchEditor } from './components/bench/BenchEditor';
+import { clearLab, decodeLabShareHash, hasShareHash, loadLab, saveLab } from './bench/storage';
+import type { Lab, Prefill } from './bench/types';
 import { BenchPlan, CHECKLIST_KEY_PREFIX } from './components/bench/BenchPlan';
 import { Icon } from './components/Icons';
+import { LabCanvas } from './components/lab/LabCanvas';
+import { LabEditor } from './components/lab/LabEditor';
 import { Landing } from './components/Landing';
 import { Results } from './components/Results';
 import { Wizard } from './components/Wizard';
@@ -28,8 +29,8 @@ function preferredTheme(): Theme {
 }
 
 interface InitialState {
-  profile?: BenchProfile;
-  /** The profile came from a share link and is not saved yet. */
+  lab?: Lab;
+  /** The lab came from a share link and is not saved yet. */
   shared: boolean;
   /** A share hash was present but could not be decoded. */
   shareError: boolean;
@@ -38,10 +39,10 @@ interface InitialState {
 /** Pure: reads the URL and storage without side effects so StrictMode double calls are harmless. */
 function initialState(): InitialState {
   const hash = window.location.hash;
-  const hasShareHash = /(^#|[#&])bench=/.test(hash);
-  const shared = hasShareHash ? decodeShareHash(hash) : undefined;
-  if (shared) return { profile: shared, shared: true, shareError: false };
-  return { profile: loadProfile(), shared: false, shareError: hasShareHash };
+  const hasHash = hasShareHash(hash);
+  const shared = hasHash ? decodeLabShareHash(hash) : undefined;
+  if (shared) return { lab: shared, shared: true, shareError: false };
+  return { lab: loadLab(), shared: false, shareError: hasHash };
 }
 
 function clearChecklists(): void {
@@ -53,11 +54,20 @@ function clearChecklists(): void {
   for (const key of keys) window.localStorage.removeItem(key);
 }
 
+/** The bench to show: the requested one, else the first bench that has devices, else the first. */
+function pickBench(lab: Lab, preferredId: string | undefined): string {
+  const preferred = preferredId ? findBench(lab, preferredId) : undefined;
+  if (preferred) return preferred.id;
+  return (lab.benches.find((bench) => bench.devices.length > 0) ?? lab.benches[0]).id;
+}
+
 export default function App() {
   const [theme, setTheme] = useState<Theme>(preferredTheme);
   const [initial] = useState(initialState);
   const [screen, setScreen] = useState<Screen>(initial.shared ? 'plan' : 'landing');
-  const [profile, setProfile] = useState<BenchProfile | undefined>(initial.profile);
+  const [lab, setLab] = useState<Lab | undefined>(initial.lab);
+  const [activeBenchId, setActiveBenchId] = useState<string | undefined>(initial.lab ? pickBench(initial.lab, undefined) : undefined);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>();
   const [shared, setShared] = useState(initial.shared);
   const [notice, setNotice] = useState<string | undefined>(initial.shareError ? SHARE_ERROR : undefined);
   const [definition, setDefinition] = useState<UseCaseDefinition>();
@@ -74,10 +84,13 @@ export default function App() {
 
   // Drop the share hash once it has been read so a reload does not re-import it.
   useEffect(() => {
-    if ((initial.shared || initial.shareError) && /(^#|[#&])bench=/.test(window.location.hash)) {
+    if ((initial.shared || initial.shareError) && hasShareHash(window.location.hash)) {
       window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
     }
   }, [initial]);
+
+  const activeBench = lab ? (findBench(lab, activeBenchId ?? '') ?? lab.benches[0]) : undefined;
+  const profile = useMemo(() => (lab && activeBench ? benchProfile(lab, activeBench) : undefined), [lab, activeBench]);
 
   const prefills = useMemo(() => {
     const map = new Map<string, Prefill>();
@@ -86,25 +99,37 @@ export default function App() {
     return map;
   }, [profile]);
 
-  const hasBench = profile !== undefined && profile.devices.length > 0;
+  const hasBench = lab !== undefined && labDeviceCount(lab) > 0;
+  const manyBenches = lab !== undefined && lab.benches.length > 1;
 
-  function updateProfile(next: BenchProfile): void {
-    setProfile(next);
-    // Editing a shared bench adopts it.
+  function changeLab(next: Lab): void {
+    setLab(next);
+    // Editing a shared lab adopts it.
     setShared(false);
-    saveProfile(next);
+    saveLab(next);
+  }
+
+  function selectBench(benchId: string): void {
+    setActiveBenchId(benchId);
+    setSelectedDeviceId(undefined);
+  }
+
+  function selectDevice(benchId: string, deviceId: string): void {
+    setActiveBenchId(benchId);
+    setSelectedDeviceId(deviceId);
   }
 
   function adoptShared(): void {
-    if (profile) saveProfile(profile);
+    if (lab) saveLab(lab);
     setShared(false);
   }
 
   function discardShared(): void {
-    const saved = loadProfile();
+    const saved = loadLab();
     setShared(false);
-    setProfile(saved);
-    setScreen(saved && saved.devices.length > 0 ? 'plan' : 'landing');
+    setLab(saved);
+    setActiveBenchId(saved ? pickBench(saved, undefined) : undefined);
+    setScreen(saved && labDeviceCount(saved) > 0 ? 'plan' : 'landing');
   }
 
   function goHome(): void {
@@ -113,25 +138,39 @@ export default function App() {
   }
 
   function openBench(): void {
-    if (!profile) setProfile(emptyProfile());
+    if (!lab) {
+      const fresh = emptyLab();
+      setLab(fresh);
+      setActiveBenchId(fresh.benches[0].id);
+    }
     setNotice(undefined);
     setScreen('bench');
   }
 
   function openPlan(): void {
-    if (hasBench) setScreen('plan');
-    else openBench();
+    if (hasBench && lab) {
+      // The plan page shows one bench; prefer one that has devices.
+      if (activeBench && activeBench.devices.length === 0) setActiveBenchId(pickBench(lab, undefined));
+      setScreen('plan');
+    } else {
+      openBench();
+    }
   }
 
-  function resetBench(): void {
-    clearProfile();
+  function resetLab(): void {
+    clearLab();
     clearChecklists();
     setShared(false);
-    setProfile(emptyProfile());
+    const fresh = emptyLab();
+    setLab(fresh);
+    setActiveBenchId(fresh.benches[0].id);
+    setSelectedDeviceId(undefined);
   }
 
   function loadSample(sample: SampleBench): void {
-    updateProfile(structuredClone(sample.profile));
+    const next = labFromProfile(structuredClone(sample.profile));
+    changeLab(next);
+    setActiveBenchId(next.benches[0].id);
     setScreen('plan');
   }
 
@@ -179,7 +218,7 @@ export default function App() {
             <span>Labgrid Setup Advisor</span>
           </button>
           <div className="header-meta">
-            <button className="header-link" onClick={openPlan}>My bench</button>
+            <button className="header-link" onClick={openPlan}>{manyBenches ? 'My lab' : 'My bench'}</button>
             <button
               className="theme-toggle"
               onClick={() => setTheme((current) => current === 'light' ? 'dark' : 'light')}
@@ -198,7 +237,7 @@ export default function App() {
       {screen === 'landing' && (
         <Landing
           entries={catalog}
-          profile={profile}
+          lab={lab}
           catalog={hardwareCatalog}
           prefills={prefills}
           samples={sampleBenches}
@@ -210,14 +249,30 @@ export default function App() {
           onLoadSample={loadSample}
         />
       )}
-      {screen === 'bench' && profile && (
-        <BenchEditor
-          profile={profile}
+      {screen === 'bench' && lab && activeBench && (
+        <LabEditor
+          lab={lab}
           catalog={hardwareCatalog}
-          onChange={updateProfile}
+          activeBenchId={activeBench.id}
+          selectedDeviceId={selectedDeviceId}
+          onChange={changeLab}
+          onSelectBench={selectBench}
+          onSelectDevice={selectDevice}
           onPlan={() => setScreen('plan')}
-          onReset={resetBench}
+          onReset={resetLab}
           onExit={goHome}
+          canvas={(announce) => (
+            <LabCanvas
+              lab={lab}
+              catalog={hardwareCatalog}
+              selectedBenchId={activeBench.id}
+              selectedDeviceId={selectedDeviceId}
+              onSelectBench={selectBench}
+              onSelectDevice={selectDevice}
+              onChange={changeLab}
+              onAnnounce={announce}
+            />
+          )}
         />
       )}
       {screen === 'plan' && profile && (

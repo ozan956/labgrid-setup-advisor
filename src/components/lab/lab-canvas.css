@@ -1,0 +1,85 @@
+/* Lab canvas: host bar, bench tiles with device bricks, palette. Uses the
+   tokens from src/styles.css so light and dark themes both work. */
+
+.lab-canvas { display: grid; gap: 16px; }
+
+.lab-rack { position: relative; display: grid; gap: 34px; }
+
+.lab-links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; z-index: 0; }
+.lab-link { fill: none; stroke: var(--line-strong); stroke-width: 1.4; }
+.lab-link.network { stroke-dasharray: 4 3; }
+
+/* Host bar */
+.lab-host-bar { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; }
+.lab-host-block { display: grid; gap: 2px; min-width: 150px; padding: 8px 12px; border: 1.5px solid var(--lime); border-radius: 6px; background: var(--panel); }
+.lab-host-block.service { border-style: dashed; border-color: var(--line-strong); }
+.lab-host-title { font-size: 13px; font-weight: 700; color: var(--ink); }
+.lab-host-subtitle { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.lab-host-arrow { color: var(--line-strong); font-size: 18px; }
+
+/* Tiles */
+.lab-tiles { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 18px; align-items: stretch; }
+.lab-tile { display: flex; flex-direction: column; gap: 8px; min-height: 200px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow); transition: border-color .12s, background-color .12s; }
+.lab-tile.selected { border-color: var(--lime); box-shadow: inset 0 0 0 1px var(--lime), var(--shadow); }
+.lab-tile.drop-target { border-style: dashed; border-color: var(--lime); background: var(--info-background); }
+
+.lab-bricks { display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; flex: 1; min-height: 0; }
+
+/* Bricks */
+.lab-brick { position: relative; display: grid; gap: 6px; padding: 8px 10px 8px 12px; border: 1px solid var(--line-strong); border-left-width: 6px; border-radius: 6px; background: var(--panel); cursor: grab; }
+.lab-canvas.read-only .lab-brick { cursor: default; }
+.lab-brick:active { cursor: grabbing; }
+.lab-brick.role-console { border-left-color: var(--lime); }
+.lab-brick.role-power { border-left-color: var(--orange); }
+.lab-brick.role-debug { border-left-color: #7a3fb8; }
+:root[data-theme="dark"] .lab-brick.role-debug { border-left-color: #c7a6f0; }
+.lab-brick.role-storage, .lab-brick.role-bootstrap { border-left-color: var(--success); }
+.lab-brick.role-network, .lab-brick.role-other { border-left-color: var(--line-strong); }
+.lab-brick.selected { outline: 2px solid var(--lime); outline-offset: 1px; }
+.lab-brick.dragging { opacity: .45; }
+.lab-brick.drop-before { box-shadow: 0 -4px 0 0 var(--lime); }
+
+.lab-brick-main { display: grid; gap: 4px; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: inherit; }
+.lab-brick-title { font-size: 13px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lab-brick-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.lab-brick-class { font-size: 11px; color: var(--muted); }
+.lab-brick-network { display: inline-flex; color: var(--muted); }
+.lab-network-glyph { width: 12px; height: 12px; fill: currentColor; }
+
+.lab-brick-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.lab-mini-button, .lab-mini-select { font: 11px var(--font); font-weight: 600; padding: 3px 7px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.lab-mini-button:hover:not(:disabled), .lab-mini-select:hover { border-color: var(--muted); }
+.lab-mini-button:disabled { opacity: .4; cursor: not-allowed; }
+.lab-mini-button.danger { color: var(--warning-text); border-color: var(--warning-border); }
+.lab-mini-button.danger.confirming { background: var(--warning-background); }
+
+/* Drop zone, empty state, board block */
+.lab-dropzone { padding: 8px; border: 1px dashed var(--line-strong); border-radius: 6px; font-size: 11px; color: var(--dim); text-align: center; }
+.lab-tile.drop-target .lab-dropzone { border-color: var(--lime); color: var(--lime); }
+.lab-empty { margin: 0; padding: 8px; font-size: 11px; color: var(--dim); text-align: center; }
+
+.lab-board { display: grid; gap: 2px; width: 100%; padding: 10px 12px; border: 0; border-radius: 6px; background: var(--lime); color: var(--selected-contrast); font: inherit; text-align: left; cursor: pointer; }
+.lab-board:hover { background: var(--accent-hover); }
+.lab-board-name { font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lab-board-place { font-size: 11px; opacity: .85; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lab-board .verification-badge { justify-self: start; margin-top: 4px; color: inherit; border-color: transparent; background: rgba(255, 255, 255, .18); }
+
+.lab-add-tile { display: grid; place-items: center; min-height: 200px; border: 1px dashed var(--line-strong); border-radius: 10px; }
+
+/* Palette */
+.lab-palette { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.lab-palette-hint { width: 100%; margin: 0 0 2px; font-size: 11px; color: var(--dim); }
+.lab-palette-brick { font: 12px var(--font); font-weight: 600; padding: 6px 10px; border: 1px solid var(--line-strong); border-left-width: 6px; border-radius: 6px; background: var(--surface); color: var(--ink); cursor: grab; }
+.lab-palette-brick:hover { border-color: var(--muted); }
+.lab-palette-brick:active { cursor: grabbing; }
+.lab-palette-brick.role-console { border-left-color: var(--lime); }
+.lab-palette-brick.role-power { border-left-color: var(--orange); }
+.lab-palette-brick.role-debug { border-left-color: #7a3fb8; }
+:root[data-theme="dark"] .lab-palette-brick.role-debug { border-left-color: #c7a6f0; }
+.lab-palette-brick.role-storage, .lab-palette-brick.role-bootstrap { border-left-color: var(--success); }
+.lab-palette-brick.role-network, .lab-palette-brick.role-other { border-left-color: var(--line-strong); }
+
+@media (max-width: 560px) {
+  .lab-tiles { grid-template-columns: 1fr; }
+  .lab-host-subtitle { max-width: 160px; }
+}

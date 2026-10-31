@@ -26,7 +26,9 @@ Remote Power Control covers:
 - supported network PDUs with `NetworkPowerPort` and `NetworkPowerDriver`;
 - manual fallback when no safe automated controller is available;
 - local benches and remote setups using an exporter, coordinator, and
-  `RemotePlace`.
+  `RemotePlace`;
+- labs with several boards on one exporter host, each with its own place and
+  group, edited together and saved as one profile.
 
 Every workflow produces reviewed component guidance, topology advice, commands,
 and conservative Labgrid YAML templates with explicit site-specific placeholders.
@@ -87,6 +89,14 @@ and export move it between browsers.
 Everything stays in the browser. The profile is kept in localStorage; no
 server receives it. Share links carry the whole profile in the URL, so do not
 put secrets in a bench description. The advisor never asks for passwords.
+
+Several boards plugged into the same machine form a lab. The editor keeps the
+shared parts (topology, exporter host, coordinator, location) in a left rail
+and lists the benches below them; each bench has its own board, devices, place
+and group. "Duplicate bench" prepares a second unit of the same board with the
+udev match values cleared, imports accept both lab and single-bench files, and
+older saved benches and `#bench=` share links open as a one-bench lab. See
+[docs/lab.md](docs/lab.md).
 
 See [docs/bench.md](docs/bench.md) for the profile model, detection, insight,
 and generation rules, and [docs/hardware-catalog.md](docs/hardware-catalog.md)

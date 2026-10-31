@@ -82,7 +82,7 @@ describe('bench journey', () => {
     expect(screen.getAllByText(/pci-0000:00:14\.0-usb-0:1\.3:1\.0/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/fix before using the files/i)).toBeInTheDocument();
     expect(screen.getAllByText(/pytest --lg-env environment\.yaml/).length).toBeGreaterThanOrEqual(1);
-    expect(window.localStorage.getItem('labgrid-advisor-bench')).toContain('nucleo-01');
+    expect(window.localStorage.getItem('labgrid-advisor-lab')).toContain('nucleo-01');
   }, 20000);
 
   it('opens a guide with complete answers straight on the results page and keeps typed values', async () => {
@@ -117,10 +117,10 @@ describe('bench journey', () => {
     expect(screen.getAllByText(/raspberry pi 4 model b/i).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/you are viewing a shared bench/i)).toBeInTheDocument();
     expect(window.location.hash).toBe('');
-    expect(window.localStorage.getItem('labgrid-advisor-bench')).toBeNull();
+    expect(window.localStorage.getItem('labgrid-advisor-lab')).toBeNull();
 
     await user.click(screen.getByRole('button', { name: /save as my bench/i }));
-    expect(window.localStorage.getItem('labgrid-advisor-bench')).toContain('pi4-01');
+    expect(window.localStorage.getItem('labgrid-advisor-lab')).toContain('pi4-01');
     expect(screen.queryByText(/you are viewing a shared bench/i)).not.toBeInTheDocument();
   });
 
@@ -131,7 +131,7 @@ describe('bench journey', () => {
 
     await user.click(screen.getByRole('button', { name: /^discard$/i }));
     expect(screen.getByRole('heading', { name: /start with your hardware/i })).toBeInTheDocument();
-    expect(window.localStorage.getItem('labgrid-advisor-bench')).toBeNull();
+    expect(window.localStorage.getItem('labgrid-advisor-lab')).toBeNull();
   });
 
   it('explains an unreadable share link', () => {
@@ -178,9 +178,9 @@ describe('bench journey', () => {
     await user.clear(custom);
     expect(custom).toHaveValue(null);
     await user.type(custom, '1500000');
-    expect(JSON.parse(window.localStorage.getItem('labgrid-advisor-bench')!).devices[0].speed).toBe(1500000);
+    expect(JSON.parse(window.localStorage.getItem('labgrid-advisor-lab')!).benches[0].devices[0].speed).toBe(1500000);
 
-    await user.click(screen.getByRole('button', { name: /remove console/i }));
+    await user.click(screen.getByRole('button', { name: 'Remove Console' }));
     expect(screen.getByRole('heading', { name: /devices \(0\)/i })).toBeInTheDocument();
   });
 
@@ -251,14 +251,14 @@ describe('bench journey', () => {
     await user.click(screen.getByRole('button', { name: /edit bench/i }));
     expect(screen.getByRole('heading', { name: /devices \(2\)/i })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /reset bench/i }));
+    await user.click(screen.getByRole('button', { name: /reset lab/i }));
     expect(screen.getByRole('button', { name: /really reset/i })).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent(/click again within 4 seconds/i);
     vi.advanceTimersByTime(4100);
-    expect(await screen.findByRole('button', { name: /^reset bench$/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /^reset lab$/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /devices \(2\)/i })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /reset bench/i }));
+    await user.click(screen.getByRole('button', { name: /reset lab/i }));
     await user.click(screen.getByRole('button', { name: /really reset/i }));
     expect(screen.getByRole('heading', { name: /devices \(0\)/i })).toBeInTheDocument();
     expect(window.localStorage.getItem('labgrid-advisor-checklist:pi4-01')).toBeNull();

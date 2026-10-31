@@ -571,3 +571,33 @@ h1[tabindex="-1"]:focus { outline: none; }
   .generated-file header > div { grid-template-columns: auto auto; }
   .generated-file header .target-badge { grid-column: 1 / 3; grid-row: 3; justify-self: start; }
 }
+
+/* Lab editor: shared settings and bench list in a rail, the active bench in the main column. */
+.lab-canvas-slot { margin-top: 22px; }
+.lab-layout { display: grid; grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); gap: 0 26px; align-items: start; }
+.lab-rail { position: sticky; top: 16px; display: grid; gap: 0; }
+.lab-section .field-grid { grid-template-columns: 1fr; }
+.lab-section .radio-group.stacked label span small { display: block; }
+.bench-list ol { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 8px; }
+.bench-item { width: 100%; display: grid; gap: 3px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--ink); text-align: left; cursor: pointer; font: inherit; }
+.bench-item strong { font-size: 14px; }
+.bench-item small { color: var(--muted); font-size: 12px; }
+.bench-item:hover { border-color: var(--line-strong); }
+.bench-item.selected { border-color: var(--lime); box-shadow: inset 3px 0 0 var(--lime); }
+.bench-item:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+.bench-toolbar { margin-top: 26px; display: grid; grid-template-columns: 1fr auto; gap: 6px 16px; align-items: center; }
+.bench-toolbar h2 { margin: 0; font-size: 22px; letter-spacing: -.01em; outline: none; }
+.bench-toolbar h2:focus-visible { outline: 2px solid var(--lime); outline-offset: 4px; border-radius: 4px; }
+.bench-toolbar-actions { display: flex; flex-wrap: wrap; gap: 4px 16px; justify-content: flex-end; }
+.bench-toolbar-actions .text-button:disabled { opacity: .45; cursor: default; }
+.bench-toolbar-hint { grid-column: 1 / -1; margin: 0; }
+.lab-main > .bench-section:first-of-type { margin-top: 16px; }
+.device-card.highlighted { border-color: var(--lime); box-shadow: 0 0 0 2px var(--info-background), 0 0 0 3px var(--lime); }
+.device-card:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+
+@media (max-width: 900px) {
+  .lab-layout { grid-template-columns: 1fr; }
+  .lab-rail { position: static; }
+  .bench-toolbar { grid-template-columns: 1fr; }
+  .bench-toolbar-actions { justify-content: flex-start; }
+}

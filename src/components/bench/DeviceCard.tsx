@@ -13,6 +13,12 @@ interface Props {
   catalog: HardwareCatalog;
   onChange: (device: BenchDevice) => void;
   onRemove: () => void;
+  /** Visually mark the card and make it focusable, e.g. after it was picked on the lab canvas. */
+  highlighted?: boolean;
+  /** DOM id so other views can scroll to and focus this card. */
+  anchorId?: string;
+  /** Called when the card or one of its controls receives focus. */
+  onFocus?: () => void;
 }
 
 interface KeyChooserProps {
@@ -178,7 +184,7 @@ function SpeedSelect({ id, value, onChange }: { id: string; value: number; onCha
   );
 }
 
-export function DeviceCard({ device, catalog, onChange, onRemove }: Props) {
+export function DeviceCard({ device, catalog, onChange, onRemove, highlighted = false, anchorId, onFocus }: Props) {
   const id = `device-${device.id}`;
   const usbId = 'usbId' in device ? device.usbId : undefined;
   const usbEntry = usbId ? findUsbDevice(catalog, usbId) : undefined;
@@ -188,7 +194,7 @@ export function DeviceCard({ device, catalog, onChange, onRemove }: Props) {
   }
 
   return (
-    <article className="device-card" aria-label={`${device.label} device`}>
+    <article className={highlighted ? 'device-card highlighted' : 'device-card'} id={anchorId} tabIndex={anchorId ? -1 : undefined} onFocus={onFocus} aria-label={`${device.label} device`}>
       <header>
         <KindBadge device={device} />
         <span className="device-kind">{KIND_LABELS[device.kind]}</span>

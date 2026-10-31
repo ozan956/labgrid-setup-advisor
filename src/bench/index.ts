@@ -19,5 +19,10 @@ export {
   validateLab, validateLabOrProfile, saveLab, loadLab, clearLab, encodeLabShareHash, decodeLabShareHash, hasShareHash, summarizeLab,
 } from './storage';
 export * from './lab';
+export { generateLabFiles, filesForBench, labZipName } from './lab-files';
+export { analyzeLab, insightsForBench, benchLabel } from './lab-insights';
+export { buildLabChecklist, unionProfile } from './lab-checklist';
+export { sampleLabs } from './lab-samples';
+export type { SampleLab } from './lab-samples';
 export { sampleBenches } from './samples';
 export type { SampleBench } from './samples';

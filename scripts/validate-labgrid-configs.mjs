@@ -55,6 +55,21 @@ try {
         manifest.push({ id: `bench/${sample.id}/${file.filename}`, kind: file.kind, path });
       }
     }
+    // Labs merge several benches into one exporter file; validate those too.
+    const { generateLabFiles } = await server.ssrLoadModule('/src/bench/lab-files.ts');
+    const { sampleLabs } = await server.ssrLoadModule('/src/bench/lab-samples.ts');
+    for (const sample of sampleLabs) {
+      for (const file of generateLabFiles(sample.lab, hardwareCatalog)) {
+        if (file.kind !== 'environment' && file.kind !== 'exporter') continue;
+        if (file.unresolved.length > 0) {
+          throw new Error(`sample lab "${sample.id}" leaves ${file.filename} unresolved: ${file.unresolved.join(', ')}`);
+        }
+        parse(file.content);
+        const path = join(directory, `lab-${sample.id}-${file.filename}`);
+        writeFileSync(path, file.content);
+        manifest.push({ id: `lab/${sample.id}/${file.filename}`, kind: file.kind, path });
+      }
+    }
   } finally {
     await server.close();
   }

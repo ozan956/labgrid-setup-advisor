@@ -131,23 +131,35 @@ export function exporterResourceNames(devices: BenchDevice[]): Map<string, strin
   return names;
 }
 
-export function buildChecklist(profile: BenchProfile, catalog: HardwareCatalog, files: GeneratedFile[]): ChecklistStep[] {
-  const steps: ChecklistStep[] = [];
+interface StepContext {
+  remote: boolean;
+  /** Environment file name used in commands and prose. */
+  envName: string;
+}
+
+function contextFor(profile: BenchProfile, files: GeneratedFile[], envNameOverride?: string): StepContext {
   const remote = profile.topology === 'remote';
-  const place = profile.names.place.trim() || 'board-01';
-  const group = profile.names.group.trim() || place;
+  const envFile = files.find((file) => file.kind === 'environment');
+  return { remote, envName: envNameOverride ?? envFile?.filename ?? (remote ? 'remote.yaml' : 'environment.yaml') };
+}
+
+/**
+ * Steps that happen once per exporter host and coordinator: installation,
+ * helper tools, device permissions, placeholders, coordinator and exporter
+ * start-up. For a lab, pass a profile whose devices are the union of all
+ * benches and `envNameOverride` to speak about "each environment file".
+ */
+export function sharedChecklistSteps(profile: BenchProfile, catalog: HardwareCatalog, files: GeneratedFile[], envNameOverride?: string): ChecklistStep[] {
+  const steps: ChecklistStep[] = [];
+  const { remote, envName } = contextFor(profile, files, envNameOverride);
   const exporterHost = profile.names.exporterHost.trim() || '<EXPORTER_HOST>';
   const nonDefaultCoordinator = profile.names.coordinator && profile.names.coordinator !== DEFAULT_COORDINATOR;
-  const consoles = devicesWithRole(profile, 'console');
-  const power = devicesWithRole(profile, 'power');
   const usbDevices = profile.devices.filter((device) => 'match' in device);
   const unresolved = [...new Set(files.flatMap((file) => file.unresolved))];
   const COMMAND_LIKE = /^(pip|pip3|python3?|sudo|apt|apt-get|dnf|brew|export)\b/;
   const extras = pduRequirements(profile, catalog);
   const extraCommands = extras.filter((requirement) => COMMAND_LIKE.test(requirement));
   const extraNotes = extras.filter((requirement) => !COMMAND_LIKE.test(requirement));
-  const envFile = files.find((file) => file.kind === 'environment');
-  const envName = envFile?.filename ?? (remote ? 'remote.yaml' : 'environment.yaml');
 
   steps.push({
     id: 'install-labgrid',
@@ -231,7 +243,26 @@ export function buildChecklist(profile: BenchProfile, catalog: HardwareCatalog, 
       commands: [`labgrid-client${coordinatorFlag(profile)} resources`],
       docs: [DOCS.client],
     });
+  }
 
+  return steps;
+}
+
+/**
+ * Steps that belong to one board: creating and trying its place (remote) or
+ * exercising its environment file (local). `files` should be the files of
+ * this bench only, so the environment file name is the right one.
+ */
+export function benchChecklistSteps(profile: BenchProfile, files: GeneratedFile[]): ChecklistStep[] {
+  const steps: ChecklistStep[] = [];
+  const { remote, envName } = contextFor(profile, files);
+  const place = profile.names.place.trim() || 'board-01';
+  const group = profile.names.group.trim() || place;
+  const exporterHost = profile.names.exporterHost.trim() || '<EXPORTER_HOST>';
+  const consoles = devicesWithRole(profile, 'console');
+  const power = devicesWithRole(profile, 'power');
+
+  if (remote) {
     const names = exporterResourceNames(profile.devices);
     const named = namedDeviceIds(profile.devices);
     steps.push({
@@ -329,12 +360,19 @@ export function buildChecklist(profile: BenchProfile, catalog: HardwareCatalog, 
     });
   }
 
-  steps.push({
+  return steps;
+}
+
+/** The closing step: verify and commit the files. */
+export function verifyChecklistStep(): ChecklistStep {
+  return {
     id: 'verify',
     title: 'Verify and keep the files under version control',
     detail: 'Once the console shows boot messages and power control works, commit the YAML files next to your tests. Keep credentials out of the files and use placeholders or environment variables instead.',
     target: 'anywhere',
-  });
+  };
+}
 
-  return steps;
+export function buildChecklist(profile: BenchProfile, catalog: HardwareCatalog, files: GeneratedFile[]): ChecklistStep[] {
+  return [...sharedChecklistSteps(profile, catalog, files), ...benchChecklistSteps(profile, files), verifyChecklistStep()];
 }

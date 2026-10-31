@@ -267,14 +267,97 @@ catalog's style and `validateBoardPreset()` checks it against
 checklist passed, by pasting it into `src/data/hardware/boards.yaml` in a pull
 request or sending it to the repository maintainer.
 
+## Labs: several benches on one exporter
+
+A **lab** (`Lab` in `src/bench/types.ts`, operations in `src/bench/lab.ts`)
+groups several benches that share one exporter host, one coordinator, one
+topology and one sharing mode. Each bench keeps its own board, place, exporter
+group, devices, Linux login and bootloader. `benchProfile(lab, bench)` projects
+a bench to the v1 profile described above, so every per-bench function
+(`generateBenchFiles`, `analyzeProfile`, `buildChecklist`, `prefillForUseCase`)
+works unchanged; the lab layer only composes them.
+
+### Files
+
+`generateLabFiles(lab, catalog, options?)` in `src/bench/lab-files.ts` returns
+`GeneratedFile[]`; files that belong to one bench carry `benchId`, shared files
+leave it undefined. `filesForBench(files, benchId)` returns a bench's files
+together with the shared ones, and `labZipName(lab)` names the bundle
+(`labgrid-rack-3.zip`).
+
+| Topology | File | Shared | Content |
+| --- | --- | --- | --- |
+| remote | `exporter.yaml` | yes | one group per bench, merged into a single document (`##` comments only, because labgrid-exporter renders the file with Jinja2); a duplicate group name gets a `-2` suffix so no bench is lost |
+| remote, non-default coordinator | `labgrid-exporter.override.conf` | yes | the same drop-in as for a bench |
+| remote | `remote-<place>.yaml` | per bench | `RemotePlace` for that bench plus its drivers |
+| local | `environment-<place>.yaml` | per bench | that bench's resources and drivers |
+| both | `SETUP.md` | yes | lab summary, a section per bench, the files, placeholders, and the checklist grouped into "Once for the lab", "For <bench>", "Finally" |
+| both | `lab-profile.json` | yes | the lab for import |
+
+The exporter header lists the lab name and every group with its board. For a
+lab with one bench the YAML bodies equal the bench files; only the comments and
+the environment file name (which carries the place) differ.
+
+### Insights
+
+`analyzeLab(lab, catalog)` in `src/bench/lab-insights.ts` returns
+`LabInsight[]` (an `Insight` with optional `benchId` and `benchLabel`, the
+board name or place). Bench insights keep their ids and are tagged with the
+bench. Insights about shared settings appear once without a bench:
+`remote-exporter-name`, `remote-coordinator-address`, `remote-exporter-tools`,
+`team-sharing`, `ykush-tools`, and `strategy-ready` (whose text names every
+bench that gets a strategy). The per-bench `ready` is dropped in favour of
+one lab-level verdict. Cross-bench rules:
+
+| Id | Severity | When |
+| --- | --- | --- |
+| `lab-duplicate-place` | critical | two benches share a place or exporter group name |
+| `lab-shared-match:<KEY>=<value>` | critical | the same non-empty udev match value (ID_SERIAL_SHORT, ID_PATH, ...) on devices of two benches: one physical device cannot be exported twice (hub ports are exempt, they share the hub's path by design) |
+| `lab-shared-outlet:<kind>:<where>:<index>` | critical | the same PDU host and outlet, YKUSH serial and port, or hub ID_PATH and port on two benches |
+| `lab-shared-pdu:<host>` | info | one PDU powers several benches through different outlets |
+| `lab-shared-hub:<path>` | info | several benches hang off different ports of one hub (bandwidth and power budget) |
+| `lab-empty-bench` | warning | a bench without devices (tagged with the bench) |
+| `lab-many-benches` | info | more than eight benches on one exporter host |
+| `lab-ready` | success | no critical insight and at least one bench has devices |
+
+`insightsForBench(insights, benchId)` filters the list; `undefined` selects
+the shared insights.
+
+### Checklist
+
+`buildLabChecklist(lab, catalog, files)` in `src/bench/lab-checklist.ts`
+returns `LabChecklistStep[]` (a `ChecklistStep` with optional `benchId` and
+`benchLabel`). The shared steps (`install-labgrid`, `install-tools`,
+`device-access`, `fill-placeholders`, `start-coordinator`, `start-exporter`,
+`check-resources`) are built once from a union profile holding every bench's
+devices (`unionProfile(lab)`), so the helper tools and PDU extras of all boards
+appear in one step. Then each bench contributes its own steps (`create-place`,
+`acquire`, `share`, `run-tests` for remote labs; `try-environment`,
+`run-tests` for local labs) with ids suffixed `:<benchId>` so they stay unique,
+and `verify` closes the list. For a single-bench lab the steps equal the
+bench checklist apart from the suffix and the environment file name.
+
+`src/bench/checklist.ts` exposes the building blocks (`sharedChecklistSteps`,
+`benchChecklistSteps`, `verifyChecklistStep`); `buildChecklist` is their
+concatenation.
+
+### Sample labs
+
+`src/bench/lab-samples.ts` holds two example labs: `rack-remote` (a Raspberry
+Pi 4 and an i.MX 8M Mini EVK on two outlets of one NETIO PDU plus an STM32
+Nucleo on a YKUSH port, shared by a team through a coordinator) and
+`desk-local` (a ZCU102 on a `uhubctl` hub port next to a BeaglePlay with manual
+power, both on this computer). The validation script renders them as well.
+
 ## Sample benches and validation
 
 `src/bench/samples.ts` holds four example benches: a Raspberry Pi 4 behind a
 NETIO PDU in a shared lab, an STM32 Nucleo with an ST-LINK on this computer,
 an i.MX 8M Mini EVK with a YKUSH and serial download mode, and a ZCU102 on a
-`uhubctl` hub with a USB-SD-Mux. `npm run validate:labgrid` renders them
-through Vite's SSR module runner and checks every environment and exporter
-file with the real Labgrid package (`scripts/validate_with_labgrid.py`).
+`uhubctl` hub with a USB-SD-Mux. `npm run validate:labgrid` renders them and
+the two sample labs through Vite's SSR module runner and checks every
+environment and exporter file with the real Labgrid package
+(`scripts/validate_with_labgrid.py`).
 
 ## Limits
 

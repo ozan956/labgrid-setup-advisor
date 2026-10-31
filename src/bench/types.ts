@@ -371,6 +371,8 @@ export interface GeneratedFile {
   target: 'exporter-host' | 'client' | 'coordinator-host';
   /** Placeholder tokens still present in the content, e.g. ['ID_SERIAL_SHORT']. Empty when the file is complete. */
   unresolved: string[];
+  /** Set on files that belong to one bench of a lab; shared files (exporter.yaml, SETUP.md, lab-profile.json) leave it undefined. */
+  benchId?: string;
 }
 
 export interface ChecklistStep {
@@ -382,6 +384,12 @@ export interface ChecklistStep {
   commands?: string[];
   docs?: Array<{ title: string; url: string }>;
 }
+
+/** An insight produced for a lab: bench-specific ones carry the bench id and a label (board name or place). */
+export type LabInsight = Insight & { benchId?: string; benchLabel?: string };
+
+/** A checklist step for a lab: shared steps have no bench, per-bench steps name theirs. */
+export type LabChecklistStep = ChecklistStep & { benchId?: string; benchLabel?: string };
 
 /** Pre-filled answers for one use-case wizard plus placeholder values for its templates. */
 export interface Prefill {
