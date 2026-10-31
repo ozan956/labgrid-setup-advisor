@@ -73,7 +73,7 @@ Generated files:
 | `environment.yaml` | local topology | resources and drivers for pytest and scripts on this computer |
 | `exporter.yaml` | remote topology | the exporter group for the machine the hardware is plugged into |
 | `remote.yaml` | remote topology | `RemotePlace` plus the same drivers for your computer |
-| `labgrid-exporter.override.conf` | coordinator not on the exporter host | systemd drop-in setting `LG_COORDINATOR` |
+| `labgrid-exporter.override.conf` | remote topology with a coordinator address other than `127.0.0.1:20408` | systemd drop-in setting `LG_COORDINATOR` |
 | `SETUP.md` | always | bench summary and the checklist |
 | `bench-profile.json` | always | the profile for import on another machine |
 

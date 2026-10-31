@@ -123,7 +123,7 @@ export const sampleBenches: SampleBench[] = [
           speed: 115200,
         },
         { id: 'dev-2', kind: 'usb-hub-port', label: 'Hub port 2', match: { ID_PATH: 'pci-0000:00:14.0-usb-0:2:1.0' }, index: 2 },
-        { id: 'dev-3', kind: 'usb-sd-mux', label: 'USB-SD-Mux', match: { '@ID_PATH': 'pci-0000:00:14.0-usb-0:2.3' } },
+        { id: 'dev-3', kind: 'usb-sd-mux', label: 'USB-SD-Mux', match: { ID_PATH: 'pci-0000:00:14.0-usb-0:2.3.1' } },
       ],
       login: { username: 'root', loginPrompt: ' login: ', prompt: 'root@[\\w-]+:[^ ]+ ' },
       bootloader: { kind: 'uboot', prompt: 'ZynqMP> ' },

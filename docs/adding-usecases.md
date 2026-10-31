@@ -63,7 +63,7 @@ npm run validate:labgrid
 npm run build
 ```
 
-Then inspect desktop and narrow layouts and exercise Previous, Next, editing,
+Then inspect desktop and narrow layouts and exercise Previous, Continue (See recommendation on the last question), editing,
 and copy behavior with a keyboard.
 
 ## Future upstream data source

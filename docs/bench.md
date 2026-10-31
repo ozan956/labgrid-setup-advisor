@@ -82,8 +82,11 @@ class picks the device kind; the entry's `serialNumber` quality and
   `labgrid-suggest` prints. The upstream examples use `'@ID_PATH'` with the
   path of the hub port instead; `@` keys only match parents, so the two values
   differ.
-- Probes are only generated as `USBDebugger` when their id is in the upstream
-  whitelist (FTDI 6010/6014, ST-LINK, KitProg3, Olimex, J-Link, ADI ICE).
+- Probes are only generated as `USBDebugger` when their catalog class is
+  `usb-debugger` or `usb-debugger-with-serial`, which mirrors the upstream
+  whitelist (ST-LINK, J-Link, Olimex ARM-USB-OCD/TINY, KitProg3, ADI ICE).
+  FTDI FT2232/FT4232/FT232H are classified as serial consoles, and Altera
+  USB-Blasters become `AlteraUSBBlaster`.
   CMSIS-DAP probes such as DAPLink are detected as consoles only, and
   USB-Blasters become `AlteraUSBBlaster` through `resourceClass`.
 - `ID_PATH` with the `:1.0` interface suffix for `USBPowerPort`.
@@ -170,7 +173,8 @@ Rules:
   indices as numbers, matching the upstream constructors.
 - Missing values are written as `<TOKEN>` (for example `<ID_PATH>`,
   `<PDU_HOST>`) and listed in `GeneratedFile.unresolved`. An empty match
-  becomes `match: { ID_SERIAL_SHORT: '<ID_SERIAL_SHORT>' }`.
+  becomes `<ID_SERIAL_SHORT>` for serial consoles and probes, and `<ID_PATH>`
+  for hub ports, USB-SD-Mux and other path-matched devices.
 - Exporter files use `##` comments only. `labgrid-exporter` renders its
   configuration through Jinja2 with `#` as the line-statement prefix, so a
   plain `# comment` is a template syntax error. Environment files are plain

@@ -60,7 +60,9 @@ React renders the catalog, the bench editor and plan, and the selected
 definition. Components receive generic question, recommendation,
 architecture, configuration, insight, file, and checklist models; there is no
 Labgrid branching logic in JSX. The browser performs no network calls and
-stores only the theme and the bench profile in localStorage.
+stores only the theme (`labgrid-advisor-theme`), the bench profile
+(`labgrid-advisor-bench`), and checklist progress per place
+(`labgrid-advisor-checklist:<place>`) in localStorage.
 
 The UI is a small state flow:
 
