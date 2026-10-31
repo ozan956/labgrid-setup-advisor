@@ -60,6 +60,16 @@ describe('lab insights composition', () => {
   });
 });
 
+describe('shared facts', () => {
+  it('states PDU model facts once for the lab when several benches use the same model', () => {
+    const insights = analyzeLab(sample('rack-remote'), hardwareCatalog);
+    const pdu = insights.filter((insight) => insight.id.startsWith('pdu-'));
+    expect(pdu.length).toBeGreaterThan(0);
+    expect(new Set(pdu.map((insight) => `${insight.id.split(':')[0]}|${insight.title}`)).size).toBe(pdu.length);
+    expect(pdu.every((insight) => insight.benchId === undefined)).toBe(true);
+  });
+});
+
 describe('cross-bench rules', () => {
   it('flags the same udev match on two benches as one device claimed twice', () => {
     const lab = sample('rack-remote');

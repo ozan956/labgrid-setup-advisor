@@ -16,6 +16,29 @@ The editor shows the lab fields in the left rail above the bench list, and the
 selected bench in the main column with the familiar steps (board, detection,
 devices, place and group, login and boot).
 
+## The lab diagram
+
+Above the form sits an interactive diagram of the lab: the host bar (your
+computer, coordinator and exporter in a remote lab; this computer in a local
+one), one tile per bench with its device bricks stacked over the board block,
+a "+ Add bench" tile and a palette of bricks, one per device kind.
+
+- Drag a brick from one bench onto another to move the device; drop it onto a
+  brick to insert it before that brick. Drag a palette brick onto a bench to
+  add a blank device of that kind, or click a palette brick to add it to the
+  selected bench.
+- Click a brick to select the device; the matching device card in the form
+  scrolls into view and takes focus. Click a board block to select the bench.
+- Without a mouse, every brick has a toolbar: **Move to…** lists the other
+  benches, **Up** and **Down** reorder, **Remove** asks for a second click.
+  Touch devices use the same toolbar because browsers do not drag with touch.
+- Every change is announced once in the editor's status line ("Console moved
+  to board-02"). Moving a device keeps its id unless the target bench already
+  uses it, in which case it is renamed.
+- Network devices (PDU outlets, serial servers, SSH) carry a small network
+  glyph and a dashed connector; USB devices connect with a solid line to the
+  exporter.
+
 ## Working with benches
 
 - **Add bench** creates an empty bench whose place is the next free
@@ -27,8 +50,8 @@ devices, place and group, login and boot).
   copied unchanged, so check the outlet index on the copy.
 - **Remove bench** asks for a second click within four seconds. Removing the
   last bench leaves one empty bench; a lab is never empty.
-- **Move up / Move down** reorder benches. The order is cosmetic today; a
-  lab-wide plan will use it for the `exporter.yaml` group order.
+- **Move up / Move down** reorder benches; `exporter.yaml` lists the groups
+  in that order and the plan page follows it.
 - Clicking a bench in the rail selects it; every edit in the main column goes
   to the selected bench only. Lab fields apply to all benches at once.
 
@@ -50,14 +73,31 @@ next to the button names the bench that needs attention.
 - **Reset lab** (two clicks) clears the saved lab, every checklist tick, and
   starts over with one empty bench.
 
+## The lab plan
+
+The plan page covers the whole lab: a read-only copy of the diagram (click a
+bench to jump to its section), insights for the whole lab first and then per
+bench, the shared files (`exporter.yaml` with every group, the systemd
+drop-in, `SETUP.md`, `lab-profile.json`), and one section per bench with its
+client environment (`remote-<place>.yaml`, or `environment-<place>.yaml` in a
+local lab), its guides pre-filled from that bench, and the "Contribute this
+board" card. The checklist lists the steps that happen once for the lab,
+then the steps for each bench, then the final verification; ticks are kept per
+lab under `labgrid-advisor-lab-checklist:<lab name or bench ids>`. Cross-bench
+rules catch one USB device or power outlet claimed by two benches, duplicate
+place or group names, and empty benches. A lab with one bench keeps the
+single-bench wording and the plain `environment.yaml` / `remote.yaml` names.
+
 ## Limits
 
-- The plan page currently shows one bench at a time (the selected one, or the
-  first bench that has devices). A lab-wide plan with a merged `exporter.yaml`
-  and a combined checklist is the next step.
-- A lab holds at most 16 benches.
+- A lab holds at most 16 benches, and a share link grows with the lab (about
+  1 kB per bench); beyond a handful of benches, exchange `lab-profile.json`
+  instead.
 - Device ids are unique per bench, not per lab; moving a device between benches
   renames it when the target bench already uses the id.
 
 The data model and the pure operations behind the editor live in
-`src/bench/lab.ts`; see [bench.md](bench.md) for the per-bench profile.
+`src/bench/lab.ts`; the lab-wide files, insights and checklist in
+`src/bench/lab-files.ts`, `lab-insights.ts` and `lab-checklist.ts`. See
+[bench.md](bench.md) for the per-bench profile and the full list of insight
+ids.

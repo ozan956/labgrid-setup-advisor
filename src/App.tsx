@@ -5,10 +5,10 @@ import { applyPrefill, prefillForUseCase } from './bench/prefill';
 import { sampleBenches, type SampleBench } from './bench/samples';
 import { clearLab, decodeLabShareHash, hasShareHash, loadLab, saveLab } from './bench/storage';
 import type { Lab, Prefill } from './bench/types';
-import { BenchPlan, CHECKLIST_KEY_PREFIX } from './components/bench/BenchPlan';
 import { Icon } from './components/Icons';
 import { LabCanvas } from './components/lab/LabCanvas';
 import { LabEditor } from './components/lab/LabEditor';
+import { LAB_CHECKLIST_KEY_PREFIX, LabPlan } from './components/lab/LabPlan';
 import { Landing } from './components/Landing';
 import { Results } from './components/Results';
 import { Wizard } from './components/Wizard';
@@ -45,11 +45,14 @@ function initialState(): InitialState {
   return { lab: loadLab(), shared: false, shareError: hasHash };
 }
 
+/** Checklist progress saved by the single-bench plan page of earlier versions. */
+const LEGACY_CHECKLIST_KEY_PREFIX = 'labgrid-advisor-checklist:';
+
 function clearChecklists(): void {
   const keys: string[] = [];
   for (let index = 0; index < window.localStorage.length; index += 1) {
     const key = window.localStorage.key(index);
-    if (key?.startsWith(CHECKLIST_KEY_PREFIX)) keys.push(key);
+    if (key?.startsWith(LAB_CHECKLIST_KEY_PREFIX) || key?.startsWith(LEGACY_CHECKLIST_KEY_PREFIX)) keys.push(key);
   }
   for (const key of keys) window.localStorage.removeItem(key);
 }
@@ -148,13 +151,8 @@ export default function App() {
   }
 
   function openPlan(): void {
-    if (hasBench && lab) {
-      // The plan page shows one bench; prefer one that has devices.
-      if (activeBench && activeBench.devices.length === 0) setActiveBenchId(pickBench(lab, undefined));
-      setScreen('plan');
-    } else {
-      openBench();
-    }
+    if (hasBench) setScreen('plan');
+    else openBench();
   }
 
   function resetLab(): void {
@@ -174,10 +172,16 @@ export default function App() {
     setScreen('plan');
   }
 
-  function openUseCase(id: string, from: Origin): void {
+  function openUseCase(id: string, from: Origin, benchId?: string): void {
     const selected = definitions.get(id);
     if (!selected) return;
-    const suggestion = prefills.get(id);
+    // A guide opened from the plan belongs to a specific bench; compute its prefill now rather
+    // than reading the memoised one for the bench that was active before this click.
+    const bench = lab && benchId ? findBench(lab, benchId) : undefined;
+    if (bench) setActiveBenchId(bench.id);
+    const suggestion = lab && bench
+      ? (bench.devices.length > 0 ? prefillForUseCase(benchProfile(lab, bench), selected, hardwareCatalog) : undefined)
+      : prefills.get(id);
     const engine = new DecisionEngine(selected);
     const sameGuide = definition?.id === id;
     // Re-opening the guide the user was already working on keeps their answers and typed values.
@@ -275,15 +279,14 @@ export default function App() {
           )}
         />
       )}
-      {screen === 'plan' && profile && (
-        <BenchPlan
-          profile={profile}
+      {screen === 'plan' && lab && (
+        <LabPlan
+          lab={lab}
           catalog={hardwareCatalog}
           entries={catalog.filter((entry) => entry.status === 'available')}
-          prefills={prefills}
           shared={shared}
-          onEdit={openBench}
-          onOpenGuide={(id) => openUseCase(id, 'plan')}
+          onEdit={(benchId) => { if (benchId) selectBench(benchId); openBench(); }}
+          onOpenGuide={(id, benchId) => openUseCase(id, 'plan', benchId)}
           onAdoptShared={adoptShared}
           onDiscardShared={discardShared}
         />

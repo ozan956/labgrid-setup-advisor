@@ -270,7 +270,10 @@ export function LabCanvas({
     if (!rack) return undefined;
     let frame = 0;
     const measure = (): void => {
-      const host = rack.querySelector<HTMLElement>('.lab-host-bar');
+      // Devices hang off the machine they are plugged into: the exporter in a
+      // remote lab, which is the last host block, or the only block locally.
+      const blocks = rack.querySelectorAll<HTMLElement>('.lab-host-bar .lab-host-block');
+      const host = blocks[blocks.length - 1] ?? rack.querySelector<HTMLElement>('.lab-host-bar');
       if (!host) return;
       const base = rack.getBoundingClientRect();
       const hostBox = host.getBoundingClientRect();

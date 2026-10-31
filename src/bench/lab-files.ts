@@ -176,6 +176,8 @@ function labProfileFile(lab: Lab): GeneratedFile {
  * file of each bench carries its bench id so the UI can group them.
  */
 export function generateLabFiles(lab: Lab, catalog: HardwareCatalog, options: GenerateOptions = {}): GeneratedFile[] {
+  // A lab with one bench keeps the plain file names the guides and docs use.
+  const single = lab.benches.length === 1;
   const files: GeneratedFile[] = [];
   const suffixes = uniqueSuffixes(lab);
   const coordinator = lab.names.coordinator.trim() || DEFAULT_COORDINATOR;
@@ -184,12 +186,12 @@ export function generateLabFiles(lab: Lab, catalog: HardwareCatalog, options: Ge
     files.push(labExporterFile(lab, options));
     if (coordinator !== DEFAULT_COORDINATOR) files.push(overrideConfFile(coordinator));
     for (const bench of lab.benches) {
-      const file = clientEnvironmentFile(benchProfile(lab, bench), options, `remote-${suffixes.get(bench.id)}.yaml`);
+      const file = clientEnvironmentFile(benchProfile(lab, bench), options, single ? 'remote.yaml' : `remote-${suffixes.get(bench.id)}.yaml`);
       files.push({ ...file, title: `Client environment: ${benchLabel(bench)}`, benchId: bench.id });
     }
   } else {
     for (const bench of lab.benches) {
-      const file = localEnvironmentFile(benchProfile(lab, bench), options, `environment-${suffixes.get(bench.id)}.yaml`);
+      const file = localEnvironmentFile(benchProfile(lab, bench), options, single ? 'environment.yaml' : `environment-${suffixes.get(bench.id)}.yaml`);
       files.push({ ...file, title: `Local environment: ${benchLabel(bench)}`, benchId: bench.id });
     }
   }

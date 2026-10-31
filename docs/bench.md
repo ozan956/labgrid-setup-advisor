@@ -289,8 +289,8 @@ together with the shared ones, and `labZipName(lab)` names the bundle
 | --- | --- | --- | --- |
 | remote | `exporter.yaml` | yes | one group per bench, merged into a single document (`##` comments only, because labgrid-exporter renders the file with Jinja2); a duplicate group name gets a `-2` suffix so no bench is lost |
 | remote, non-default coordinator | `labgrid-exporter.override.conf` | yes | the same drop-in as for a bench |
-| remote | `remote-<place>.yaml` | per bench | `RemotePlace` for that bench plus its drivers |
-| local | `environment-<place>.yaml` | per bench | that bench's resources and drivers |
+| remote | `remote-<place>.yaml` (`remote.yaml` when the lab has one bench) | per bench | `RemotePlace` for that bench plus its drivers |
+| local | `environment-<place>.yaml` (`environment.yaml` when the lab has one bench) | per bench | that bench's resources and drivers |
 | both | `SETUP.md` | yes | lab summary, a section per bench, the files, placeholders, and the checklist grouped into "Once for the lab", "For <bench>", "Finally" |
 | both | `lab-profile.json` | yes | the lab for import |
 
@@ -340,6 +340,23 @@ bench checklist apart from the suffix and the environment file name.
 `src/bench/checklist.ts` exposes the building blocks (`sharedChecklistSteps`,
 `benchChecklistSteps`, `verifyChecklistStep`); `buildChecklist` is their
 concatenation.
+
+### Plan page
+
+`LabPlan` (`src/components/lab/LabPlan.tsx`) renders a whole lab: the header
+names the lab (or the single board), summarises it with `summarizeLab()` and
+offers the ZIP bundle (`labZipName()`), a `#lab=` share link and the lab JSON;
+a read-only `LabCanvas` follows, and clicking a board there focuses that
+bench's section (`id="bench-<id>"`). Insights are shown for the whole lab
+first, then per bench; shared files (`exporter.yaml`, the systemd drop-in,
+`SETUP.md`, `lab-profile.json`) come before one section per bench with its
+own files, guides (`onOpenGuide(useCaseId, benchId)`) and "Contribute this
+board" card. The checklist lists the shared steps once ("Once for the lab"),
+then each bench's steps, then the final check; progress is stored per lab
+under `labgrid-advisor-lab-checklist:<lab name or sorted bench ids>`
+(`LAB_CHECKLIST_KEY_PREFIX`). A one-bench lab renders with the single-board
+wording ("Your bench plan", "Your files", "Guides for your bench") so nothing
+changes for users with one board.
 
 ### Sample labs
 

@@ -95,8 +95,12 @@ shared parts (topology, exporter host, coordinator, location) in a left rail
 and lists the benches below them; each bench has its own board, devices, place
 and group. "Duplicate bench" prepares a second unit of the same board with the
 udev match values cleared, imports accept both lab and single-bench files, and
-older saved benches and `#bench=` share links open as a one-bench lab. See
-[docs/lab.md](docs/lab.md).
+older saved benches and `#bench=` share links open as a one-bench lab. An
+interactive diagram shows the host, the benches and their device bricks;
+drag bricks between benches or from the palette, or use the keyboard toolbar.
+The plan page then merges every bench into one `exporter.yaml`, writes a
+client environment per bench, and warns when two benches claim the same USB
+device or power outlet. See [docs/lab.md](docs/lab.md).
 
 See [docs/bench.md](docs/bench.md) for the profile model, detection, insight,
 and generation rules, and [docs/hardware-catalog.md](docs/hardware-catalog.md)

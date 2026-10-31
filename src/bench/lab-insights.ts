@@ -14,6 +14,8 @@ const SEVERITY_ORDER: Record<InsightSeverity, number> = { critical: 0, warning: 
 
 /** Insight ids that describe the lab's shared settings, kept once. */
 const SHARED_IDS = new Set(['remote-exporter-name', 'remote-coordinator-address', 'remote-exporter-tools', 'team-sharing', 'ykush-tools', 'strategy-ready']);
+/** Insights that describe a PDU model rather than one device's values; stated once per lab. */
+const MODEL_FACT_IDS = new Set(['pdu-index-base', 'pdu-requirements', 'pdu-credentials', 'pdu-unknown-model']);
 /** Per-bench completeness is replaced by the lab-level verdict. */
 const DROPPED_IDS = new Set(['ready']);
 
@@ -166,12 +168,24 @@ function outletInsights(lab: Lab): LabInsight[] {
 export function analyzeLab(lab: Lab, catalog: HardwareCatalog): LabInsight[] {
   const insights: LabInsight[] = [];
   const seenShared = new Set<string>();
+  const seenModelFacts = new Set<string>();
   const strategyBenches: string[] = [];
 
   for (const bench of lab.benches) {
     const label = benchLabel(bench);
     for (const insight of analyzeProfile(benchProfile(lab, bench), catalog)) {
       if (DROPPED_IDS.has(insight.id)) continue;
+      // Facts about a PDU model (index base, extra software, credentials) hold for
+      // every bench on that PDU; say them once for the lab instead of per bench.
+      // Problems with one device's values (host format, index range) stay per bench.
+      const [idBase] = insight.id.split(':');
+      if (MODEL_FACT_IDS.has(idBase)) {
+        const key = `${idBase}|${insight.title}`;
+        if (seenModelFacts.has(key)) continue;
+        seenModelFacts.add(key);
+        insights.push({ ...insight });
+        continue;
+      }
       if (SHARED_IDS.has(insight.id)) {
         if (insight.id === 'strategy-ready') strategyBenches.push(label);
         if (seenShared.has(insight.id)) continue;

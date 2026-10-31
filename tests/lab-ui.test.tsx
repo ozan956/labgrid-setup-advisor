@@ -28,7 +28,7 @@ async function openEmptyBench(user: ReturnType<typeof userEvent.setup>) {
 async function openSampleEditor(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /try an example bench/i }));
   await user.click(screen.getByRole('button', { name: /raspberry pi 4 in a shared lab/i }));
-  await user.click(screen.getByRole('button', { name: /^edit bench$/i }));
+  await user.click(screen.getAllByRole('button', { name: /^edit bench$/i })[0]);
   expect(screen.getByRole('heading', { name: /bench 1: raspberry pi 4 model b/i })).toBeInTheDocument();
 }
 
@@ -170,7 +170,7 @@ describe('lab editor', () => {
     expect(lab.benches).toHaveLength(2);
 
     await user.click(screen.getByRole('button', { name: /see my plan/i }));
-    expect(screen.getByRole('heading', { name: /your bench plan/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /rack 3 plan/i })).toBeInTheDocument();
     expect(screen.getAllByText(/rack-pc/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText(/board-01/).length).toBeGreaterThanOrEqual(1);
   });
@@ -220,7 +220,7 @@ describe('lab editor', () => {
     expect(screen.getByRole('heading', { name: /your bench plan/i })).toBeInTheDocument();
     expect(screen.getAllByText(/pi4-01/).length).toBeGreaterThanOrEqual(1);
 
-    await user.click(screen.getByRole('button', { name: /^edit bench$/i }));
+    await user.click(screen.getAllByRole('button', { name: /^edit bench$/i })[0]);
     await user.click(screen.getByRole('button', { name: /^add bench$/i }));
     expect(storedLab().benches).toHaveLength(2);
     expect(storedLab().benches[0].place).toBe('pi4-01');

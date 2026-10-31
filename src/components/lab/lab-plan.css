@@ -1,0 +1,32 @@
+/* Lab plan page: shared parts first, then one section per bench. Uses the
+   tokens and result-section styles from styles.css. */
+
+.lab-plan .plan-meta { font-size: 13px; color: var(--muted); margin: 0 0 10px !important; }
+
+.lab-plan .lab-bench-section { scroll-margin-top: 24px; }
+.lab-plan .lab-bench-section:focus { outline: none; }
+.lab-plan .lab-bench-section:focus-visible { outline: 2px solid var(--lime); outline-offset: 10px; border-radius: 6px; }
+.lab-plan .lab-bench-section:not(.single) { padding-top: 34px; border-top: 1px solid var(--line); }
+
+.lab-plan .lab-bench-heading h2 { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.lab-plan .lab-bench-heading p code { font-size: 13px; }
+
+.lab-plan .lab-bench-block { margin-top: 26px; }
+.lab-plan .lab-bench-block > .section-copy { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+
+.lab-plan .lab-subheading { margin: 0 0 14px; font-size: 16px; font-weight: 700; letter-spacing: -.01em; color: var(--ink); }
+.lab-plan .lab-subheading a { color: inherit; text-decoration: none; border-bottom: 1px dashed var(--line); }
+.lab-plan .lab-subheading a:hover, .lab-plan .lab-subheading a:focus-visible { color: var(--lime); border-bottom-color: var(--lime); }
+.lab-plan .lab-subheading-meta { margin-left: 6px; font-weight: 500; font-size: 13px; color: var(--muted); }
+
+.lab-plan .lab-insight-sections, .lab-plan .lab-checklist-groups { display: grid; gap: 28px; }
+.lab-plan .insight-group h4 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; }
+
+.lab-plan .use-case-card h4 { margin: 0 0 6px; font-size: 17px; }
+
+.lab-plan .lab-plan-footer { display: flex; gap: 14px; align-items: center; padding: 30px 0 10px; border-top: 1px solid var(--line); }
+
+@media (max-width: 720px) {
+  .lab-plan .lab-bench-heading { flex-direction: column; align-items: flex-start; }
+  .lab-plan .lab-plan-footer { flex-direction: column; align-items: flex-start; }
+}

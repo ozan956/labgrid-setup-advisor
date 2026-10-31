@@ -247,8 +247,8 @@ describe('bench journey', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderApp();
     await loadSample(user);
-    window.localStorage.setItem('labgrid-advisor-checklist:pi4-01', JSON.stringify(['install-labgrid']));
-    await user.click(screen.getByRole('button', { name: /edit bench/i }));
+    window.localStorage.setItem('labgrid-advisor-lab-checklist:bench-1', JSON.stringify(['install-labgrid']));
+    await user.click(screen.getAllByRole('button', { name: /edit bench/i })[0]);
     expect(screen.getByRole('heading', { name: /devices \(2\)/i })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /reset lab/i }));
@@ -261,7 +261,7 @@ describe('bench journey', () => {
     await user.click(screen.getByRole('button', { name: /reset lab/i }));
     await user.click(screen.getByRole('button', { name: /really reset/i }));
     expect(screen.getByRole('heading', { name: /devices \(0\)/i })).toBeInTheDocument();
-    expect(window.localStorage.getItem('labgrid-advisor-checklist:pi4-01')).toBeNull();
+    expect(window.localStorage.getItem('labgrid-advisor-lab-checklist:bench-1')).toBeNull();
     expect(screen.getByLabelText(/exporter group/i)).toBeDisabled();
   });
 
@@ -274,7 +274,7 @@ describe('bench journey', () => {
     const [firstStep] = checklist.getAllByRole('checkbox');
     await user.click(firstStep);
     expect(screen.getByText(/1 of \d+ done/i)).toBeInTheDocument();
-    const stored = JSON.parse(window.localStorage.getItem('labgrid-advisor-checklist:pi4-01')!);
+    const stored = JSON.parse(window.localStorage.getItem('labgrid-advisor-lab-checklist:bench-1')!);
     expect(stored).toHaveLength(1);
 
     first.unmount();
@@ -293,9 +293,9 @@ describe('bench journey', () => {
 
     await user.click(screen.getByRole('button', { name: /copy share link/i }));
     const link = (await screen.findByLabelText(/^share link$/i)) as HTMLInputElement;
-    expect(link.value).toContain('#bench=');
+    expect(link.value).toContain('#lab=');
 
-    await user.click(screen.getByRole('button', { name: /download bundle/i }));
+    await user.click(screen.getAllByRole('button', { name: /download bundle/i })[0]);
     expect(URL.createObjectURL).toHaveBeenCalled();
   });
 
@@ -343,7 +343,7 @@ describe('bench journey', () => {
     expect(card.getByText(/passes the catalog schema/i)).toBeInTheDocument();
     expect(article.querySelector('pre')?.textContent).toContain('    verification: lab\n');
     expect(article.querySelector('pre')?.textContent).toContain('- id: raspberry-pi-4-model-b');
-    expect(card.getByText(/share it only after the checklist above passed/i)).toBeInTheDocument();
+    expect(card.getByText(/share it only after the checklist passed/i)).toBeInTheDocument();
 
     await user.click(card.getByRole('button', { name: /download board-raspberry-pi-4-model-b\.yaml/i }));
     expect(URL.createObjectURL).toHaveBeenCalled();

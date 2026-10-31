@@ -39,6 +39,10 @@ the format reviewable. A general rule language is intentionally out of scope.
 It is also independent of React:
 
 - `types.ts` and `profile.ts` define the `BenchProfile` and helpers;
+- `lab.ts` wraps several benches that share an exporter host and coordinator
+  (`Lab`, pure add/duplicate/remove/move operations, `benchProfile()` projection),
+  and `lab-files.ts`, `lab-insights.ts`, `lab-checklist.ts` compose the
+  per-bench functions into lab-wide output;
 - `catalog.ts` loads the reviewed hardware YAML under `src/data/hardware/`
   with JSON Schema and semantic checks;
 - `parsers/` read `lsusb`, `udevadm info`, and `labgrid-suggest` output, and
@@ -56,13 +60,15 @@ change. See [bench.md](bench.md) and [hardware-catalog.md](hardware-catalog.md).
 
 ## Presentation
 
-React renders the catalog, the bench editor and plan, and the selected
+React renders the catalog, the lab editor with its drag-and-drop canvas
+(`src/components/lab/`), the lab plan, and the selected
 definition. Components receive generic question, recommendation,
 architecture, configuration, insight, file, and checklist models; there is no
 Labgrid branching logic in JSX. The browser performs no network calls and
-stores only the theme (`labgrid-advisor-theme`), the bench profile
-(`labgrid-advisor-bench`), and checklist progress per place
-(`labgrid-advisor-checklist:<place>`) in localStorage.
+stores only the theme (`labgrid-advisor-theme`), the lab
+(`labgrid-advisor-lab`; a bench saved by an earlier version under
+`labgrid-advisor-bench` is upgraded on load), and checklist progress per lab
+(`labgrid-advisor-lab-checklist:<key>`) in localStorage.
 
 The UI is a small state flow:
 

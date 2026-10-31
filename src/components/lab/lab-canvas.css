@@ -80,6 +80,7 @@
 .lab-palette-brick.role-network, .lab-palette-brick.role-other { border-left-color: var(--line-strong); }
 
 @media (max-width: 560px) {
+  .lab-add-tile { min-height: 96px; }
   .lab-tiles { grid-template-columns: 1fr; }
   .lab-host-subtitle { max-width: 160px; }
 }
